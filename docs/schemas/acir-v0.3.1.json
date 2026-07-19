@@ -1,0 +1,2207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ACIR Document v0.3.1",
+  "description": "Formal JSON-schema for ACIR v0.3 documents (supports both 0.3.0 and 0.3.1). v0.3.1 adds the string form for $calculate (named reference to module.transforms[]). Everything else — data primitives, F_FOREACH, F_GUARD, $auth, $context, $verify, $validate, $conditional — is unchanged between 0.3.0 and 0.3.1. Semantic checks (e.g. $auth in public route, $calculate DSL parse, $input wildcard scope, output-type-matches-body) are enforced by the validator beyond what JSON-schema can express.",
+  "type": "object",
+  "required": [
+    "acir_version"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "acir_version": {
+      "enum": [
+        "0.3.0",
+        "0.3.1",
+        "0.3.2"
+      ]
+    },
+    "module": {
+      "$ref": "#/$defs/Module"
+    },
+    "system": {
+      "$ref": "#/$defs/System"
+    },
+    "acir_kind": {
+      "enum": [
+        "module",
+        "project"
+      ],
+      "description": "Document kind. Absent ⇒ \"module\" (fully backward-compatible). \"project\" ⇒ multi-component manifest (carries `project`, not `module`)."
+    },
+    "project": {
+      "$ref": "#/$defs/ProjectManifest"
+    }
+  },
+  "$defs": {
+    "Module": {
+      "type": "object",
+      "required": [
+        "name",
+        "types",
+        "units"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TypeDef"
+          }
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Unit"
+          }
+        },
+        "exposed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IOExpose"
+          }
+        },
+        "transforms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TransformDecl"
+          }
+        },
+        "validators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ValidatorDecl"
+          }
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RelationDecl"
+          }
+        },
+        "runtime": {
+          "$ref": "#/$defs/Runtime"
+        }
+      }
+    },
+    "System": {
+      "description": "Roadmap v0.3+ multi-module support â€” out of scope for v0.3.0 (single-module). Accepted shape-wise to leave the door open.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "Runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "base_image": {
+          "type": "string"
+        },
+        "build": {
+          "enum": [
+            "multi-stage",
+            "single-stage"
+          ]
+        },
+        "health_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string",
+              "pattern": "^/"
+            },
+            "interval": {
+              "type": "string"
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "$secret"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "$secret": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "TypeDef": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DRecord"
+        },
+        {
+          "$ref": "#/$defs/DEnum"
+        },
+        {
+          "$ref": "#/$defs/DAlias"
+        }
+      ]
+    },
+    "DRecord": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "name",
+        "fields"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "D_RECORD"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Field"
+          }
+        },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Contract"
+          }
+        }
+      }
+    },
+    "DEnum": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "name",
+        "values"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "D_ENUM"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "doc": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "DAlias": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "name",
+        "base_type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "D_ALIAS"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "base_type": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Contract"
+          }
+        }
+      }
+    },
+    "Field": {
+      "type": "object",
+      "required": [
+        "name",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "type": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "default": {},
+        "immutable": {
+          "type": "boolean"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Contract"
+          }
+        }
+      }
+    },
+    "TypeRef": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "$ref"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$ref": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/DScalar"
+        },
+        {
+          "$ref": "#/$defs/DCollection"
+        }
+      ]
+    },
+    "DScalar": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "D_SCALAR"
+        },
+        "kind": {
+          "enum": [
+            "string",
+            "integer",
+            "decimal",
+            "boolean",
+            "datetime",
+            "date",
+            "time",
+            "duration",
+            "binary",
+            "uuid",
+            "void"
+          ]
+        }
+      }
+    },
+    "DCollection": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "D_COLLECTION"
+        },
+        "kind": {
+          "enum": [
+            "list",
+            "set",
+            "map",
+            "queue",
+            "stack"
+          ]
+        },
+        "element_type": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "key_type": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "value_type": {
+          "$ref": "#/$defs/TypeRef"
+        }
+      }
+    },
+    "Unit": {
+      "description": "X_UNIT — business logic composition. The `output` shape and unit body's effective return are cross-checked at validator level (output: scalar on IO_QUERY without limit:1/single:true is rejected).",
+      "type": "object",
+      "required": [
+        "primitive",
+        "name",
+        "body"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "X_UNIT"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][A-Za-z0-9]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "input": {
+          "$ref": "#/$defs/UnitInput"
+        },
+        "output": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "body": {
+          "$ref": "#/$defs/Operation"
+        }
+      }
+    },
+    "UnitInput": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "$ref"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$ref": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/DRecord"
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "D_RECORD"
+            },
+            "fields": {
+              "type": "array"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/DScalar"
+        }
+      ]
+    },
+    "Operation": {
+      "description": "All flow-control + I/O primitives. Each entry is dispatched by its `primitive` field.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FSequence"
+        },
+        {
+          "$ref": "#/$defs/FBranch"
+        },
+        {
+          "$ref": "#/$defs/FGuard"
+        },
+        {
+          "$ref": "#/$defs/FForeach"
+        },
+        {
+          "$ref": "#/$defs/FErrorHandle"
+        },
+        {
+          "$ref": "#/$defs/IOQuery"
+        },
+        {
+          "$ref": "#/$defs/IOMutate"
+        },
+        {
+          "$ref": "#/$defs/IOCall"
+        },
+        {
+          "$ref": "#/$defs/FNative"
+        }
+      ]
+    },
+    "FNative": {
+      "description": "Typed escape hatch. The validator validates the BOUNDARY (input/output TypeRef, declared effects), NEVER the `impl` body. Allowed as a unit `body` or as a step op of F_SEQUENCE (via Operation) — never as a DataExpr (absent from DataExpr.oneOf). The compiler injects the target block verbatim.",
+      "type": "object",
+      "required": [
+        "primitive",
+        "name",
+        "input",
+        "output",
+        "impl"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "F_NATIVE"
+        },
+        "name": {
+          "type": "string"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "input": {
+          "$ref": "#/$defs/UnitInput"
+        },
+        "output": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "effects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(network|filesystem|time|random|secret:[A-Z0-9_]+)$"
+          }
+        },
+        "impl": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "py-fastapi": {
+              "type": "string"
+            },
+            "ts-fastify": {
+              "type": "string"
+            },
+            "java-quarkus": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "FSequence": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "steps"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "F_SEQUENCE"
+        },
+        "atomic": {
+          "type": "boolean"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "op"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][A-Za-z0-9_]*$"
+              },
+              "op": {
+                "$ref": "#/$defs/Operation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "FBranch": {
+      "description": "Runtime branch â€” `condition` is a Predicate (boolean expression). v0.2 had a degenerate form without runtime conditions ; v0.3 requires the predicate.",
+      "type": "object",
+      "required": [
+        "primitive",
+        "condition",
+        "then"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "F_BRANCH"
+        },
+        "condition": {
+          "$ref": "#/$defs/Predicate"
+        },
+        "then": {
+          "$ref": "#/$defs/Operation"
+        },
+        "else": {
+          "$ref": "#/$defs/Operation"
+        }
+      }
+    },
+    "FGuard": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "condition"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "F_GUARD"
+        },
+        "condition": {
+          "$ref": "#/$defs/Predicate"
+        },
+        "on_fail": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "not_found",
+                "conflict",
+                "validation_failed",
+                "unauthorized",
+                "forbidden",
+                "internal"
+              ]
+            },
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string",
+              "description": "Convenience: shorthand for {kind: validation_failed, message: <error>}"
+            }
+          }
+        }
+      }
+    },
+    "FForeach": {
+      "description": "Iterate over a list. `mode: sequential` (default) await each iter ; `mode: parallel` issue all in parallel (Promise.all/CompletableFuture.allOf/asyncio.gather). `on_error: halt` is the only valid value in v0.3.",
+      "type": "object",
+      "required": [
+        "primitive",
+        "items",
+        "do"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "F_FOREACH"
+        },
+        "items": {
+          "$ref": "#/$defs/DataExpr"
+        },
+        "as": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Loop variable name accessible via {$loop: \"<name>.<field>\"} inside `do`. Default: \"item\"."
+        },
+        "mode": {
+          "enum": [
+            "sequential",
+            "parallel"
+          ],
+          "default": "sequential"
+        },
+        "on_error": {
+          "enum": [
+            "halt"
+          ],
+          "default": "halt"
+        },
+        "do": {
+          "$ref": "#/$defs/Operation"
+        }
+      }
+    },
+    "FErrorHandle": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "operation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "F_ERROR_HANDLE"
+        },
+        "operation": {
+          "$ref": "#/$defs/Operation"
+        },
+        "on_error": {
+          "$ref": "#/$defs/Operation"
+        }
+      }
+    },
+    "IOQuery": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "entity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "IO_QUERY"
+        },
+        "source_kind": {
+          "enum": [
+            "relational"
+          ],
+          "default": "relational"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "filter": {
+          "$ref": "#/$defs/FilterExpr"
+        },
+        "single": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pagination": {
+          "$ref": "#/$defs/PaginationConfig"
+        },
+        "sort": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SortConfig"
+          }
+        },
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "IOMutate": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "entity",
+        "action"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "IO_MUTATE"
+        },
+        "source_kind": {
+          "enum": [
+            "relational"
+          ],
+          "default": "relational"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "create",
+            "update",
+            "patch",
+            "delete"
+          ]
+        },
+        "filter": {
+          "$ref": "#/$defs/FilterExpr"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DataObject"
+            },
+            {
+              "$ref": "#/$defs/MergeExpr"
+            }
+          ]
+        },
+        "return": {
+          "enum": [
+            "full_record",
+            "id",
+            "count",
+            "none",
+            "void"
+          ]
+        }
+      }
+    },
+    "IOExpose": {
+      "type": "object",
+      "required": [
+        "primitive",
+        "kind",
+        "route",
+        "method",
+        "handler"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "IO_EXPOSE"
+        },
+        "kind": {
+          "enum": [
+            "http_endpoint"
+          ]
+        },
+        "route": {
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "input": {
+          "$ref": "#/$defs/UnitInput"
+        },
+        "input_source": {
+          "enum": [
+            "body",
+            "query",
+            "path",
+            "composite"
+          ]
+        },
+        "input_layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "body": {
+              "type": "string"
+            }
+          }
+        },
+        "output": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "handler": {
+          "type": "object",
+          "required": [
+            "$ref"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$ref": {
+              "type": "string"
+            }
+          }
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "roles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "rate_limit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "window": {
+              "type": "string",
+              "pattern": "^PT"
+            },
+            "scope": {
+              "enum": [
+                "per_user",
+                "per_ip",
+                "per_api_key",
+                "global"
+              ]
+            }
+          }
+        },
+        "response_mapping": {
+          "type": "object"
+        }
+      }
+    },
+    "FilterExpr": {
+      "description": "Canonical filter (object map): each key is a field name and the value is either {operator, value} (canonical), a bare DataExpr (shorthand for eq), or `when_present` for conditional filters. Multi-key filters AND the predicates together.",
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "enum": [
+                  "eq",
+                  "ne",
+                  "gt",
+                  "gte",
+                  "lt",
+                  "lte",
+                  "in",
+                  "nin",
+                  "like",
+                  "is_null",
+                  "is_not_null"
+                ]
+              },
+              "value": {
+                "$ref": "#/$defs/DataExpr"
+              },
+              "optional": {
+                "type": "boolean"
+              }
+            }
+          },
+          {
+            "$ref": "#/$defs/DataExpr"
+          }
+        ]
+      },
+      "properties": {
+        "when_present": {
+          "type": "string"
+        },
+        "then": {
+          "type": "object"
+        }
+      }
+    },
+    "DataObject": {
+      "description": "Object whose values are DataExprs. Used in IO_MUTATE.data, $transform.input, $verify, etc.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/DataExpr"
+      }
+    },
+    "PaginationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "$ref": "#/$defs/PaginationParam"
+        },
+        "limit": {
+          "$ref": "#/$defs/PaginationParam"
+        },
+        "offset": {
+          "$ref": "#/$defs/PaginationParam"
+        },
+        "per_page": {
+          "$ref": "#/$defs/PaginationParam"
+        }
+      }
+    },
+    "PaginationParam": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$input": {
+          "type": "string"
+        },
+        "default": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "SortConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/InputRef"
+            }
+          ]
+        },
+        "direction": {
+          "enum": [
+            "asc",
+            "desc"
+          ]
+        }
+      }
+    },
+    "DataExpr": {
+      "description": "Anything that produces a value. Either a literal (string/number/bool/null), a $-ref, or a derived expression. The `not` clauses below explicitly forbid `$param` (hard-deprecated synonym of $input, decision Q1).",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/InputRef"
+        },
+        {
+          "$ref": "#/$defs/AuthRef"
+        },
+        {
+          "$ref": "#/$defs/ContextRef"
+        },
+        {
+          "$ref": "#/$defs/StepRef"
+        },
+        {
+          "$ref": "#/$defs/LoopRef"
+        },
+        {
+          "$ref": "#/$defs/GenerateExpr"
+        },
+        {
+          "$ref": "#/$defs/CalculateExpr"
+        },
+        {
+          "$ref": "#/$defs/TransformExpr"
+        },
+        {
+          "$ref": "#/$defs/VerifyExpr"
+        },
+        {
+          "$ref": "#/$defs/ValidateExpr"
+        },
+        {
+          "$ref": "#/$defs/ConditionalExpr"
+        },
+        {
+          "$ref": "#/$defs/HashExpr"
+        },
+        {
+          "$ref": "#/$defs/MergeExpr"
+        }
+      ],
+      "not": {
+        "type": "object",
+        "required": [
+          "$param"
+        ],
+        "description": "Q1: $param is hard-deprecated, use $input"
+      }
+    },
+    "InputRef": {
+      "description": "Reference to the unit's input. Bare `$input` (empty string) refers to the whole input when it's a D_SCALAR. Wildcard `*` only allowed inside $calculate.formula and as F_FOREACH.items source (enforced at validator level, not in pure JSON-schema).",
+      "type": "object",
+      "required": [
+        "$input"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$input": {
+          "type": "string"
+        }
+      }
+    },
+    "AuthRef": {
+      "description": "Read a JWT claim. Standard claims recognized: user_id/id/sub, email/username/upn, role/roles/groups. Custom claims accessed by exact name.",
+      "type": "object",
+      "required": [
+        "$auth"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$auth": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ContextRef": {
+      "description": "Read from the request scope (non-auth). Must use a namespace prefix: `request.*` (HTTP context like ip, user_agent) or `tenant.*` (multi-tenant middleware).",
+      "type": "object",
+      "required": [
+        "$context"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$context": {
+          "type": "string",
+          "pattern": "^(request|tenant)\\."
+        }
+      }
+    },
+    "StepRef": {
+      "description": "Reference to a prior step result inside an F_SEQUENCE. Format: `<step_name>` or `<step_name>.<field>` (dot-access on the step's output entity).",
+      "type": "object",
+      "required": [
+        "$step"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$step": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "LoopRef": {
+      "description": "Reference to the F_FOREACH loop variable. Format: `<loop_var>.<field>` (dot-access).",
+      "type": "object",
+      "required": [
+        "$loop"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$loop": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "GenerateExpr": {
+      "description": "Generate a value at compile/runtime. String form for builtins (uuid/now/sequence/ulid/nanoid). Dict form for parameterized generators (slug, template).",
+      "type": "object",
+      "required": [
+        "$generate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$generate": {
+          "oneOf": [
+            {
+              "enum": [
+                "uuid",
+                "now",
+                "sequence",
+                "ulid",
+                "nanoid"
+              ]
+            },
+            {
+              "type": "object",
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": true,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "uuid",
+                    "now",
+                    "sequence",
+                    "ulid",
+                    "nanoid",
+                    "slug",
+                    "template"
+                  ]
+                },
+                "from": {
+                  "type": "string",
+                  "description": "slug only: source field name"
+                },
+                "lowercase": {
+                  "type": "boolean",
+                  "description": "slug only"
+                },
+                "max_length": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "slug only"
+                },
+                "format": {
+                  "type": "string",
+                  "description": "template only: format string with placeholders"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "CalculateExpr": {
+      "description": "Computed field via a strict DSL (arithmetic + named aggregators + dot-access + wildcard inside aggregators only). Two forms supported : (1) inline dict with `{formula, inputs}` â€” the formula is parsed by the validator's BNF grammar ; (2) v0.3.1 string form `$calculate: \"<transform_name>\"` â€” named reference resolved against module.transforms[]. The referenced transform's body must itself be a `$calculate` dict so the formula can be inlined at the call site.",
+      "type": "object",
+      "required": [
+        "$calculate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$calculate": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "formula"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "formula": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "inputs": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/DataExpr"
+                  }
+                }
+              }
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "v0.3.1 â€” named reference to module.transforms[<this-name>]. The transform's body must be `{$calculate: {formula, ...}}` ; the formula is inlined at compile time."
+            }
+          ]
+        }
+      }
+    },
+    "TransformExpr": {
+      "description": "Call a named transform declared in module.transforms. Body must be PURE â€” no IO_QUERY/IO_MUTATE inside (validator-enforced, decision Q2).",
+      "type": "object",
+      "required": [
+        "$transform"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$transform": {
+          "type": "object",
+          "required": [
+            "function"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "function": {
+              "type": "string",
+              "minLength": 1
+            },
+            "input": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        }
+      }
+    },
+    "VerifyExpr": {
+      "description": "Verify a plaintext value against its stored hash. Compiled to AuthService.verifyPassword() in the target.",
+      "type": "object",
+      "required": [
+        "$verify"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$verify": {
+          "type": "object",
+          "required": [
+            "value",
+            "hash",
+            "algorithm"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "$ref": "#/$defs/DataExpr"
+            },
+            "hash": {
+              "$ref": "#/$defs/DataExpr"
+            },
+            "algorithm": {
+              "enum": [
+                "bcrypt",
+                "pbkdf2",
+                "argon2"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "ValidateExpr": {
+      "description": "Call a named validator declared in module.validators. Returns a boolean ; typically used in F_GUARD.condition.",
+      "type": "object",
+      "required": [
+        "$validate"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$validate": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "input": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ConditionalExpr": {
+      "description": "Ternary expression. `if` is a Predicate, `then`/`else` are DataExprs.",
+      "type": "object",
+      "required": [
+        "$conditional"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$conditional": {
+          "type": "object",
+          "required": [
+            "if",
+            "then",
+            "else"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "if": {
+              "$ref": "#/$defs/Predicate"
+            },
+            "then": {
+              "$ref": "#/$defs/DataExpr"
+            },
+            "else": {
+              "$ref": "#/$defs/DataExpr"
+            }
+          }
+        }
+      }
+    },
+    "HashExpr": {
+      "description": "Hash a plaintext value (typically a password before persist). Compiled to AuthService.hashPassword().",
+      "type": "object",
+      "required": [
+        "$hash"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$hash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DataExpr"
+            },
+            {
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "value": {
+                  "$ref": "#/$defs/DataExpr"
+                },
+                "algorithm": {
+                  "enum": [
+                    "bcrypt",
+                    "pbkdf2",
+                    "argon2"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "MergeExpr": {
+      "description": "Patch/merge multiple DataExprs into a single object literal. Used in IO_MUTATE.data for partial updates.",
+      "type": "object",
+      "required": [
+        "$merge"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "$merge": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "Predicate": {
+      "description": "Boolean expression. Used in F_BRANCH.condition, F_GUARD.condition, $conditional.if.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "$eq"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$eq": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$ne"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$ne": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$gt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$gt": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$gte"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$gte": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$lt"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$lt": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$lte"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$lte": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$in"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$in": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$nin"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$nin": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "$ref": "#/$defs/DataExpr"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$and"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$and": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/Predicate"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$or"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$or": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/Predicate"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$not"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$not": {
+              "$ref": "#/$defs/Predicate"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$is_null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$is_null": {
+              "$ref": "#/$defs/DataExpr"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "$is_not_null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "$is_not_null": {
+              "$ref": "#/$defs/DataExpr"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/VerifyExpr"
+        },
+        {
+          "$ref": "#/$defs/ValidateExpr"
+        }
+      ]
+    },
+    "Contract": {
+      "description": "Field-level (or record-level) constraint. Compiled to Zod/Hibernate-Validator/Pydantic at the HTTP boundary (C_* stays boundary-only; cross-field server-side checks use module.validators[]).",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_LENGTH"
+            },
+            "min": {
+              "type": "integer"
+            },
+            "max": {
+              "type": "integer"
+            },
+            "exact": {
+              "type": "integer"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_PATTERN"
+            },
+            "regex": {
+              "type": "string"
+            },
+            "format": {
+              "enum": [
+                "email",
+                "url",
+                "uuid",
+                "ipv4",
+                "ipv6"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_RANGE"
+            },
+            "min": {},
+            "max": {},
+            "exclusive_min": {
+              "type": "boolean"
+            },
+            "exclusive_max": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_UNIQUE"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "scope": {
+              "enum": [
+                "global",
+                "tenant",
+                "org"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_PRECISION"
+            },
+            "precision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "scale": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_SIZE"
+            },
+            "min": {
+              "type": "integer"
+            },
+            "max": {
+              "type": "integer"
+            },
+            "non_empty": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_SANITIZE"
+            },
+            "modes": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "trim",
+                  "html_escape",
+                  "sql_escape",
+                  "lowercase",
+                  "uppercase"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_ENCRYPT"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_SECURITY"
+            },
+            "modes": {
+              "type": "array"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_RATE_LIMIT"
+            },
+            "limit": {
+              "type": "integer"
+            },
+            "window": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "primitive"
+          ],
+          "properties": {
+            "primitive": {
+              "const": "C_AUDIT"
+            }
+          }
+        }
+      ]
+    },
+    "TransformDecl": {
+      "description": "Top-level pure transform declaration. Body is restricted to data primitives + flow primitives (F_FOREACH/F_BRANCH) WITHOUT any IO_*. Validator enforces purity recursively (decision Q2).",
+      "type": "object",
+      "required": [
+        "name",
+        "input",
+        "output",
+        "body"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/TypeRef"
+          }
+        },
+        "output": {
+          "$ref": "#/$defs/TypeRef"
+        },
+        "body": {
+          "type": "object",
+          "description": "Pure value expression ($calculate canonical) OR pure flow (F_FOREACH/F_BRANCH with value-producing branches). Accept-any-object here on purpose: a transform body is a pure DSL whose real contract (no IO_*) is enforced semantically by the validator (TRANSFORM_IMPURITY), not by JSON-schema. A strict Operation shape wrongly rejects canonical value-flow transforms (e.g. F_BRANCH then:{$loop}/{$merge}) — cf. the ecommerce-v0.3 example."
+        }
+      }
+    },
+    "ValidatorDecl": {
+      "description": "Top-level server-side validator declaration. Returns a boolean ; called via {$validate} inside F_GUARD.condition. NOT emitted as Zod/Hibernate (decision Q5: server-side only).",
+      "type": "object",
+      "required": [
+        "name",
+        "input",
+        "rule"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/TypeRef"
+          }
+        },
+        "rule": {
+          "$ref": "#/$defs/Predicate"
+        }
+      }
+    },
+    "RelationDecl": {
+      "description": "Top-level first-class relation. `on_delete` is intentionally absent (decision Q4) â€” each compiler applies its framework default.",
+      "type": "object",
+      "required": [
+        "name",
+        "kind",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9_]*$"
+        },
+        "kind": {
+          "enum": [
+            "one_to_one",
+            "one_to_many",
+            "many_to_one",
+            "many_to_many"
+          ]
+        },
+        "from": {
+          "type": "object",
+          "required": [
+            "entity",
+            "field"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "entity": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9]*$"
+            },
+            "field": {
+              "type": "string",
+              "pattern": "^[a-z_][a-z0-9_]*$"
+            },
+            "fk_column": {
+              "type": "string",
+              "pattern": "^[a-z_][a-z0-9_]*$"
+            }
+          }
+        },
+        "to": {
+          "type": "object",
+          "required": [
+            "entity"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "entity": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Za-z0-9]*$"
+            },
+            "inverse_field": {
+              "type": "string",
+              "pattern": "^[a-z_][a-z0-9_]*$"
+            }
+          }
+        },
+        "join_table": {
+          "type": "string",
+          "pattern": "^[a-z_][a-z0-9_]*$"
+        },
+        "join_columns": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ProjectComponent": {
+      "description": "One component = one microservice. References (or inlines) a single-`module` ACIR doc, plus its target/runtime/dependencies.",
+      "type": "object",
+      "required": [
+        "name",
+        "document",
+        "target",
+        "runtime"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "document": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "$component"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "$component": {
+                  "type": "string",
+                  "description": "path/key of the component's ACIR doc"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "required": [
+                "$inline"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "$inline": {
+                  "type": "object",
+                  "description": "embedded component ACIR doc"
+                }
+              }
+            }
+          ]
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "language",
+            "framework"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "language": {
+              "type": "string"
+            },
+            "framework": {
+              "type": "string"
+            }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "description": "Runtime shape consumed by the infrastructure compiler (port/base_image/build/health/env). Permissive in 0.3.2 (like System) — to be hardened later.",
+          "additionalProperties": true
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "$component"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "$component": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z0-9]*$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ProjectManifest": {
+      "description": "Multi-component project manifest. First-class evolution of the `system` block (which becomes the degenerate 1-component case). `infrastructure` stays permissive (consumed as-is by the infrastructure compiler); the `db_isolation` knob (per_component|shared) lives on the service side.",
+      "type": "object",
+      "required": [
+        "name",
+        "components"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+        },
+        "doc": {
+          "type": "string"
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ProjectComponent"
+          }
+        },
+        "infrastructure": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "networking": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "observability": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "IOCall": {
+      "description": "Synchronous HTTP call to ANOTHER component of the project (microservice). `module` must appear in the calling component's dependencies; the base URL is resolved at runtime from the `<MODULE>_URL` env injected by the infrastructure compiler. ACIR 0.3.2.",
+      "type": "object",
+      "required": [
+        "primitive",
+        "module",
+        "endpoint",
+        "method"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "const": "IO_CALL"
+        },
+        "module": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Za-z0-9]*$",
+          "description": "Nom du composant cible (∈ dependencies[$component])"
+        },
+        "endpoint": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "Route of the target component, {x} placeholders resolved via path_params"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "path_params": {
+          "$ref": "#/$defs/DataObject"
+        },
+        "query": {
+          "$ref": "#/$defs/DataObject"
+        },
+        "body": {
+          "$ref": "#/$defs/DataObject"
+        },
+        "propagate_auth": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-forwards the caller's JWT (Authorization header)"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "on_error": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "not_found",
+                "conflict",
+                "validation_failed",
+                "unauthorized",
+                "forbidden",
+                "internal"
+              ]
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "acir_kind"
+        ],
+        "properties": {
+          "acir_kind": {
+            "const": "project"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "project"
+        ],
+        "not": {
+          "required": [
+            "module"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "module"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,566 @@
+{
+  "acir_version": "0.3.0",
+  "module": {
+    "name": "ECommerce",
+    "doc": "v0.3 stress-test brief — exercises $auth/$calculate/$generate template/F_FOREACH parallel/transforms/validators/relations",
+    "types": [
+      {
+        "primitive": "D_ENUM",
+        "name": "OrderStatus",
+        "values": [
+          {
+            "name": "PENDING"
+          },
+          {
+            "name": "PAID"
+          },
+          {
+            "name": "SHIPPED"
+          },
+          {
+            "name": "DELIVERED"
+          },
+          {
+            "name": "CANCELLED"
+          }
+        ]
+      },
+      {
+        "primitive": "D_RECORD",
+        "name": "Order",
+        "identity": [
+          "id"
+        ],
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          },
+          {
+            "name": "order_number",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "$ref": "OrderStatus"
+            }
+          },
+          {
+            "name": "total_ht",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "decimal"
+            },
+            "contracts": [
+              {
+                "primitive": "C_PRECISION",
+                "precision": 12,
+                "scale": 2
+              }
+            ]
+          },
+          {
+            "name": "created_at",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "datetime"
+            },
+            "immutable": true
+          }
+        ]
+      },
+      {
+        "primitive": "D_RECORD",
+        "name": "OrderItem",
+        "identity": [
+          "id"
+        ],
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          },
+          {
+            "name": "order_id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          },
+          {
+            "name": "product_id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          },
+          {
+            "name": "quantity",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "integer"
+            },
+            "contracts": [
+              {
+                "primitive": "C_RANGE",
+                "min": 1
+              }
+            ]
+          },
+          {
+            "name": "unit_price",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "decimal"
+            }
+          }
+        ]
+      },
+      {
+        "primitive": "D_RECORD",
+        "name": "Product",
+        "identity": [
+          "id"
+        ],
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          },
+          {
+            "name": "stock_available",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "integer"
+            }
+          }
+        ]
+      },
+      {
+        "primitive": "D_RECORD",
+        "name": "CartItem",
+        "fields": [
+          {
+            "name": "product_id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          },
+          {
+            "name": "quantity",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "integer"
+            },
+            "contracts": [
+              {
+                "primitive": "C_RANGE",
+                "min": 1
+              }
+            ]
+          },
+          {
+            "name": "unit_price",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "decimal"
+            },
+            "contracts": [
+              {
+                "primitive": "C_RANGE",
+                "min": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "primitive": "D_RECORD",
+        "name": "CreateOrderInput",
+        "fields": [
+          {
+            "name": "items",
+            "type": {
+              "primitive": "D_COLLECTION",
+              "kind": "list",
+              "element_type": {
+                "$ref": "CartItem"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "transforms": [
+      {
+        "name": "snapshot_cart_items",
+        "doc": "Joins the client cart with current Product prices to freeze the snapshot.",
+        "input": {
+          "cart": {
+            "primitive": "D_COLLECTION",
+            "kind": "list",
+            "element_type": {
+              "$ref": "CartItem"
+            }
+          },
+          "products": {
+            "primitive": "D_COLLECTION",
+            "kind": "list",
+            "element_type": {
+              "$ref": "Product"
+            }
+          }
+        },
+        "output": {
+          "primitive": "D_COLLECTION",
+          "kind": "list",
+          "element_type": {
+            "$ref": "OrderItem"
+          }
+        },
+        "body": {
+          "primitive": "F_FOREACH",
+          "items": {
+            "$input": "cart"
+          },
+          "as": "cart_item",
+          "do": {
+            "primitive": "F_BRANCH",
+            "condition": {
+              "$is_not_null": {
+                "$loop": "cart_item.product_id"
+              }
+            },
+            "then": {
+              "primitive": "F_FOREACH",
+              "items": {
+                "$input": "products"
+              },
+              "as": "product",
+              "do": {
+                "primitive": "F_BRANCH",
+                "condition": {
+                  "$eq": [
+                    {
+                      "$loop": "product.id"
+                    },
+                    {
+                      "$loop": "cart_item.product_id"
+                    }
+                  ]
+                },
+                "then": {
+                  "$conditional": {
+                    "if": {
+                      "$eq": [
+                        {
+                          "$loop": "product.id"
+                        },
+                        {
+                          "$loop": "cart_item.product_id"
+                        }
+                      ]
+                    },
+                    "then": {
+                      "$loop": "cart_item.quantity"
+                    },
+                    "else": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    ],
+    "validators": [
+      {
+        "name": "order_cancellable",
+        "doc": "An order can only be cancelled from the pending or paid statuses.",
+        "input": {
+          "order": {
+            "$ref": "Order"
+          }
+        },
+        "rule": {
+          "$in": [
+            {
+              "$input": "order.status"
+            },
+            "PENDING"
+          ]
+        }
+      }
+    ],
+    "relations": [
+      {
+        "name": "orderItems",
+        "kind": "one_to_many",
+        "from": {
+          "entity": "Order",
+          "field": "items"
+        },
+        "to": {
+          "entity": "OrderItem",
+          "inverse_field": "order"
+        }
+      },
+      {
+        "name": "orderItemProduct",
+        "kind": "many_to_one",
+        "from": {
+          "entity": "OrderItem",
+          "field": "product",
+          "fk_column": "product_id"
+        },
+        "to": {
+          "entity": "Product",
+          "inverse_field": "order_items"
+        }
+      }
+    ],
+    "units": [
+      {
+        "primitive": "X_UNIT",
+        "name": "createOrder",
+        "input": {
+          "$ref": "CreateOrderInput"
+        },
+        "output": {
+          "$ref": "Order"
+        },
+        "body": {
+          "primitive": "F_SEQUENCE",
+          "atomic": true,
+          "steps": [
+            {
+              "name": "createOrderRecord",
+              "op": {
+                "primitive": "IO_MUTATE",
+                "entity": "orders",
+                "action": "create",
+                "data": {
+                  "id": {
+                    "$generate": "uuid"
+                  },
+                  "order_number": {
+                    "$generate": {
+                      "kind": "template",
+                      "format": "ORD-{date:%Y%m%d}-{seq:04d}"
+                    }
+                  },
+                  "user_id": {
+                    "$auth": "user_id"
+                  },
+                  "status": "PENDING",
+                  "total_ht": {
+                    "$calculate": {
+                      "formula": "sum(items.quantity * items.unit_price)",
+                      "inputs": {
+                        "items": {
+                          "$input": "items"
+                        }
+                      }
+                    }
+                  },
+                  "created_at": {
+                    "$generate": "now"
+                  }
+                },
+                "return": "full_record"
+              }
+            },
+            {
+              "name": "decrementStocks",
+              "op": {
+                "primitive": "F_FOREACH",
+                "items": {
+                  "$input": "items"
+                },
+                "as": "item",
+                "mode": "sequential",
+                "do": {
+                  "primitive": "IO_MUTATE",
+                  "entity": "products",
+                  "action": "update",
+                  "filter": {
+                    "id": {
+                      "operator": "eq",
+                      "value": {
+                        "$loop": "item.product_id"
+                      }
+                    }
+                  },
+                  "data": {
+                    "stock_available": {
+                      "$loop": "item.quantity"
+                    }
+                  },
+                  "return": "count"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "primitive": "X_UNIT",
+        "name": "cancelOrder",
+        "input": {
+          "primitive": "D_RECORD",
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "primitive": "D_SCALAR",
+                "kind": "uuid"
+              }
+            }
+          ]
+        },
+        "output": {
+          "$ref": "Order"
+        },
+        "body": {
+          "primitive": "F_SEQUENCE",
+          "atomic": true,
+          "steps": [
+            {
+              "name": "fetchOrder",
+              "op": {
+                "primitive": "IO_QUERY",
+                "entity": "orders",
+                "filter": {
+                  "id": {
+                    "operator": "eq",
+                    "value": {
+                      "$input": "id"
+                    }
+                  },
+                  "user_id": {
+                    "operator": "eq",
+                    "value": {
+                      "$auth": "user_id"
+                    }
+                  }
+                },
+                "single": true
+              }
+            },
+            {
+              "name": "validateCancellable",
+              "op": {
+                "primitive": "F_GUARD",
+                "condition": {
+                  "$validate": {
+                    "name": "order_cancellable",
+                    "input": {
+                      "order": {
+                        "$step": "fetchOrder"
+                      }
+                    }
+                  }
+                },
+                "on_fail": {
+                  "kind": "validation_failed",
+                  "code": "ORDER_NOT_CANCELLABLE",
+                  "message": "Order can no longer be cancelled"
+                }
+              }
+            },
+            {
+              "name": "markCancelled",
+              "op": {
+                "primitive": "IO_MUTATE",
+                "entity": "orders",
+                "action": "update",
+                "filter": {
+                  "id": {
+                    "operator": "eq",
+                    "value": {
+                      "$input": "id"
+                    }
+                  }
+                },
+                "data": {
+                  "status": "CANCELLED"
+                },
+                "return": "full_record"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "exposed": [
+      {
+        "primitive": "IO_EXPOSE",
+        "kind": "http_endpoint",
+        "route": "/orders",
+        "method": "POST",
+        "input": {
+          "$ref": "CreateOrderInput"
+        },
+        "input_source": "body",
+        "output": {
+          "$ref": "Order"
+        },
+        "handler": {
+          "$ref": "createOrder"
+        },
+        "auth": {
+          "required": true
+        }
+      },
+      {
+        "primitive": "IO_EXPOSE",
+        "kind": "http_endpoint",
+        "route": "/orders/{id}/cancel",
+        "method": "POST",
+        "input": {
+          "primitive": "D_RECORD",
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "primitive": "D_SCALAR",
+                "kind": "uuid"
+              }
+            }
+          ]
+        },
+        "input_source": "path",
+        "output": {
+          "$ref": "Order"
+        },
+        "handler": {
+          "$ref": "cancelOrder"
+        },
+        "auth": {
+          "required": true
+        }
+      }
+    ]
+  }
+}

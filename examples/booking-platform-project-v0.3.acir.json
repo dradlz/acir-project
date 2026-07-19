@@ -1,0 +1,163 @@
+{
+  "acir_version": "0.3.2",
+  "acir_kind": "project",
+  "project": {
+    "name": "BookingPlatform",
+    "doc": "Canonical example: 3 interdependent microservices. auth (identity/JWT), catalog (rooms), booking (reservations, depends on auth + catalog). Each service has its own single-module ACIR doc; the manifest orchestrates. Per-component DB isolation.",
+    "components": [
+      {
+        "name": "Auth",
+        "doc": "Identity service. Issues/verifies HS256 JWTs (shared key via env).",
+        "document": {
+          "$component": "auth.acir.json"
+        },
+        "target": {
+          "language": "python",
+          "framework": "fastapi"
+        },
+        "runtime": {
+          "port": 8080,
+          "base_image": "python:3.12-slim",
+          "build": {
+            "strategy": "single-stage",
+            "build_command": "pip install --no-cache-dir -r requirements.txt",
+            "run_command": "sh -c \"set -e; alembic upgrade head; exec uvicorn app.main:app --host 0.0.0.0 --port 8080\"",
+            "artifact_path": "."
+          },
+          "health": {
+            "path": "/health",
+            "interval": "PT10S",
+            "timeout": "PT5S",
+            "retries": 5,
+            "start_period": "PT25S"
+          },
+          "env": [],
+          "secrets": [
+            "JWT_SECRET"
+          ]
+        },
+        "dependencies": []
+      },
+      {
+        "name": "Catalog",
+        "doc": "Manages rooms. Public reads, admin-role writes (JWT verified via Auth's shared key).",
+        "document": {
+          "$component": "catalog.acir.json"
+        },
+        "target": {
+          "language": "typescript",
+          "framework": "fastify"
+        },
+        "runtime": {
+          "port": 8080,
+          "base_image": "node:20-slim",
+          "build": {
+            "strategy": "single-stage",
+            "build_command": "npm install && npm run build",
+            "run_command": "sh -c \"npx prisma db push --accept-data-loss --skip-generate && node dist/server.js\"",
+            "artifact_path": "dist"
+          },
+          "health": {
+            "path": "/health",
+            "interval": "PT10S",
+            "timeout": "PT5S",
+            "retries": 5,
+            "start_period": "PT25S"
+          },
+          "env": [],
+          "secrets": [
+            "JWT_SECRET"
+          ]
+        },
+        "dependencies": [
+          {
+            "$component": "Auth"
+          }
+        ]
+      },
+      {
+        "name": "Booking",
+        "doc": "Reservations. POST /bookings calls Catalog (GET /rooms/{id} via CATALOG_URL) to check availability; depends on Auth for the JWT. PENDING→CONFIRMED→CANCELLED transition (F_GUARD).",
+        "document": {
+          "$component": "booking.acir.json"
+        },
+        "target": {
+          "language": "java",
+          "framework": "quarkus"
+        },
+        "runtime": {
+          "port": 8080,
+          "base_image": "eclipse-temurin:21-jre",
+          "build": {
+            "strategy": "multi-stage",
+            "builder_image": "maven:3.9-eclipse-temurin-21",
+            "build_command": "mvn -B -ntp -DskipTests package",
+            "run_command": "java -jar quarkus-run.jar",
+            "artifact_path": "target/quarkus-app"
+          },
+          "health": {
+            "path": "/health",
+            "interval": "PT10S",
+            "timeout": "PT5S",
+            "retries": 5,
+            "start_period": "PT25S"
+          },
+          "env": [],
+          "secrets": [
+            "JWT_SECRET"
+          ]
+        },
+        "dependencies": [
+          {
+            "$component": "Auth"
+          },
+          {
+            "$component": "Catalog"
+          }
+        ]
+      }
+    ],
+    "infrastructure": {
+      "outputs": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "services": [
+        {
+          "name": "postgres",
+          "kind": "postgresql",
+          "image": "postgres:16-alpine",
+          "port": 5432,
+          "used_by": [
+            "Auth",
+            "Catalog",
+            "Booking"
+          ],
+          "db_isolation": "per_component",
+          "env": [
+            {
+              "name": "POSTGRES_DB",
+              "value": "appdb"
+            },
+            {
+              "name": "POSTGRES_USER",
+              "value": "app"
+            },
+            {
+              "name": "POSTGRES_PASSWORD",
+              "value": "app"
+            }
+          ],
+          "volumes": [
+            {
+              "name": "pgdata",
+              "mount_path": "/var/lib/postgresql/data"
+            }
+          ]
+        }
+      ],
+      "networking": {},
+      "observability": {}
+    }
+  }
+}
