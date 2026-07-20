@@ -3035,14 +3035,14 @@ def validate_file(filepath: str) -> ValidationResult:
         result = ValidationResult(valid=False)
         result.issues.append(ValidationIssue(
             level=0, severity=Severity.ERROR, path="$",
-            code="INVALID_JSON", message=f"JSON invalide: {e}"
+            code="INVALID_JSON", message=f"Invalid JSON: {e}"
         ))
         return result
     except FileNotFoundError:
         result = ValidationResult(valid=False)
         result.issues.append(ValidationIssue(
             level=0, severity=Severity.ERROR, path="$",
-            code="FILE_NOT_FOUND", message=f"Fichier introuvable: {filepath}"
+            code="FILE_NOT_FOUND", message=f"File not found: {filepath}"
         ))
         return result
 

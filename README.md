@@ -41,6 +41,7 @@ ACIR proposes to complete the chain, borrowing a pattern that industries like ED
 | **Specification** | [`spec/`](spec/README.md) — the format: 5 primitive families (Data, Flow, I/O, Contract, Composition), value expressions, module & project document kinds | **v0.3.x** |
 | **JSON Schema** | [`docs/schemas/acir-v0.3.1.json`](docs/schemas/acir-v0.3.1.json) — normative shapes, Draft 2020-12, closed enums, `additionalProperties: false` | Normative |
 | **Validator** | [`validator/`](validator/README.md) — the 6-level reference validator, including the 15 security rules. Single-file Python; optional `jsonschema` dependency for the schema pass | Working |
+| **Generation tool** | [`tools/generate.py`](tools/README.md) — brief → LLM (Anthropic / OpenAI / Mistral, your key) → validated document, with automatic error-feedback retries; offline mock mode for CI | Working |
 | **Examples** | [`examples/`](examples/README.md) — a stress-test e-commerce module, and a 3-microservice project manifest mixing Java/Quarkus, TypeScript/Fastify, and Python/FastAPI in one system | Validating 6/6 |
 
 **Not published yet, coming next:** the deterministic compilers (Java/Quarkus, TypeScript/Fastify, Python/FastAPI, and the infrastructure compiler that derives Docker/compose from project manifests). They exist and are stable — they are being extracted from the platform codebase for standalone publication. Publishing the spec and validator first is deliberate: the format is the standard; compilers are implementations of it, and we want independent ones to be possible from day one.
@@ -48,12 +49,22 @@ ACIR proposes to complete the chain, borrowing a pattern that industries like ED
 ## Try it now
 
 ```bash
-git clone <this repo> && cd acir
+git clone https://github.com/dradlz/acir-project.git && cd acir-project
 pip install jsonschema   # optional, enables the JSON-Schema pass
 
 python validator/acir_validator.py examples/ecommerce-v0.3.acir.json
 # ✅ ACIR VALID — 6/6 levels passed
 ```
+
+Generate your own document from a brief, with any LLM (your key, read from env):
+
+```bash
+export ANTHROPIC_API_KEY=...   # or OPENAI_API_KEY / MISTRAL_API_KEY
+python tools/generate.py --provider anthropic \
+  --brief "REST API for a product catalog with unique SKU, positive price, pagination, role-based auth"
+```
+
+The tool validates every response and feeds errors back to the model until the document passes — the generate→validate→correct loop this project is about, in one command. See [tools/README.md](tools/README.md).
 
 Then open the example and break it on purpose: remove the `auth` block from a POST endpoint and re-validate — watch `MUTATION_NO_AUTH` block the document at level 5. That is the project's core claim in one command: **a document that would compile into insecure code does not validate.**
 

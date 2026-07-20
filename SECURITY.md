@@ -6,7 +6,7 @@ ACIR's core promise is that generated code is safe and auditable. Security repor
 
 **Please do not open a public issue for security problems.**
 
-Report privately via GitHub's **"Report a vulnerability"** (Security tab → Private vulnerability reporting) or by email to **security@ldlabs.dev**.
+Report privately via GitHub's **"Report a vulnerability"** button (Security tab → Private vulnerability reporting — enabled on this repository). If that channel is unavailable to you, open a plain issue saying only "security report — requesting a private channel", with **no technical details**, and a maintainer will arrange one.
 
 Include if possible: the affected component (validator, a specific compiler, CLI), a minimal ACIR document reproducing the issue, and the generated output demonstrating the problem.
 

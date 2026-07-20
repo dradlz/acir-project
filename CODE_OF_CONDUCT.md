@@ -19,7 +19,7 @@ Be professional, be kind, argue about ideas.
 
 ## Enforcement
 
-Report conduct issues privately to **conduct@ldlabs.dev**. Reports are handled confidentially by the maintainers.
+Report conduct issues privately to the maintainer (**@dradlz** — see the profile for contact options), or use GitHub's ["Report content"](https://docs.github.com/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam) feature for anything that also violates GitHub's own rules. Reports are handled confidentially.
 
 Consequences scale with severity and repetition: a private warning, then a public warning, then a temporary ban, then a permanent ban. Egregious behavior (threats, harassment, doxxing) skips the ladder.
 
