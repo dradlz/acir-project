@@ -32,7 +32,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "validator"))
-from acir_validator import ACIRValidator, Severity  # noqa: E402
+from acir_validator import ACIRValidator, Severity, force_utf8_output  # noqa: E402
 
 SYSTEM_PROMPT_PATH = REPO_ROOT / "docs" / "prompts" / "acir-system-prompt.md"
 
@@ -177,6 +177,8 @@ def run(provider_fn, model: str, brief: str, max_attempts: int, out_path: Path) 
 
 
 def main() -> int:
+    force_utf8_output()
+
     ap = argparse.ArgumentParser(description="Generate an ACIR document with an LLM and validate it.")
     ap.add_argument("--provider", required=True, choices=["anthropic", "openai", "mistral", "mock"])
     ap.add_argument("--model", help="Model name (defaults per provider; names age — override freely).")
