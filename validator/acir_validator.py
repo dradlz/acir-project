@@ -30,6 +30,21 @@ except ImportError:
     _JSONSCHEMA_AVAILABLE = False
 
 
+# ─── Console output ────────────────────────────────────────────────────────────
+
+def force_utf8_output() -> None:
+    """Switch stdout/stderr to UTF-8 so reports render on legacy consoles.
+
+    Windows consoles default to a legacy code page (cp1252) that cannot encode
+    the status and box-drawing characters used in the reports, which makes
+    `print` raise UnicodeEncodeError. Call this from CLI entry points only —
+    embedders keep control of their own streams.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
+
 # ─── Versioning ────────────────────────────────────────────────────────────────
 # Convention : <ACIR-major>.<ACIR-minor>.<ACIR-patch>.<patch-iter> (cf. docs/COMPILER-VERSIONING.md).
 # The validator tracks the most recent ACIR version it supports (0.3.0);
@@ -544,11 +559,11 @@ class ACIRValidator:
                             f"$.project.components[{cname}]",
                             "CROSS_CALL_UNKNOWN_SERVICE",
                             f"'{cname}' makes an IO_CALL to '{tgt}', which is NOT "
-                            f"un service de ce projet (composants : "
+                            f"a service of this project (components: "
                             f"{', '.join(sorted(name_set))}). The generator has "
                             f"probably invented an external system. ACIR "
-                            f"IO_CALL ne sert qu'aux appels entre microservices "
-                            f"DU projet.",
+                            f"IO_CALL is only for calls between microservices "
+                            f"OF the project.",
                             suggestion=(f"Rephrase the brief of '{cname}' for "
                                         f"'{tgt}' to be handled as internal "
                                         f"logic/stub (NO IO_CALL), OR describe "
@@ -621,7 +636,7 @@ class ACIRValidator:
         elif not MODULE_NAME_PATTERN.match(name):
             self._issue(1, Severity.WARNING, f"{path}.name", "MODULE_NAME_FORMAT",
                        f"Name '{name}' should be PascalCase",
-                       "Utiliser un format comme 'ProductCatalog'")
+                       "Use a format like 'ProductCatalog'")
 
         # Types
         types = module.get("types", [])
@@ -674,7 +689,7 @@ class ACIRValidator:
         primitive = typedef.get("primitive")
         if primitive not in VALID_PRIMITIVES:
             self._issue(1, Severity.ERROR, f"{path}.primitive", "INVALID_PRIMITIVE",
-                       f"Primitive inconnue: '{primitive}'")
+                       f"Unknown primitive: '{primitive}'")
             return
 
         if not primitive.startswith("D_"):
@@ -759,7 +774,7 @@ class ACIRValidator:
         elif not FIELD_NAME_PATTERN.match(name):
             self._issue(1, Severity.WARNING, f"{path}.name", "FIELD_NAME_FORMAT",
                        f"Field name '{name}' should be snake_case",
-                       "Utiliser un format comme 'created_at'")
+                       "Use a format like 'created_at'")
         if "type" not in f:
             self._issue(1, Severity.ERROR, f"{path}.type", "MISSING_FIELD_TYPE",
                        f"Field '{name}' must have a 'type'")
@@ -1051,7 +1066,7 @@ class ACIRValidator:
                 if isinstance(spec, dict) and "$default" in spec:
                     self._issue(1, Severity.ERROR, f"{path}.{field}.$default",
                                "PAGINATION_DEFAULT_NON_CANONICAL",
-                               f"pagination.{field}.$default non canonique ; utilisez 'default' (sans $)")
+                               f"pagination.{field}.$default is not canonical; use 'default' (without $)")
 
     def _validate_expose(self, expose: dict, path: str):
         """Validate an IO_EXPOSE."""
@@ -1077,7 +1092,7 @@ class ACIRValidator:
                 src = expose["input_source"]
                 if isinstance(src, dict):
                     self._issue(1, Severity.ERROR, f"{path}.input_source", "INPUT_SOURCE_INLINE_OBJECT",
-                               "input_source non canonique (objet inline) ; utilisez "
+                               "input_source is not canonical (inline object); use "
                                "input_source: \"composite\" + input_layout: {path:[...], body:\"...\"}")
                 elif isinstance(src, str):
                     if src in self._INPUT_SOURCE_SYNONYMS:
@@ -1171,13 +1186,13 @@ class ACIRValidator:
             return
         if primitive not in VALID_PRIMITIVES:
             self._issue(1, Severity.ERROR, f"{path}.primitive", "UNKNOWN_CONTRACT",
-                       f"Contrat inconnu: '{primitive}'")
+                       f"Unknown contract: '{primitive}'")
 
         # Specific validations
         if primitive == "C_RANGE":
             if "min" not in contract and "max" not in contract:
                 self._issue(1, Severity.WARNING, f"{path}", "RANGE_NO_BOUNDS",
-                           "C_RANGE sans min ni max est inutile")
+                           "C_RANGE without min or max has no effect")
 
         elif primitive == "C_PATTERN":
             regex = contract.get("regex")
@@ -1199,12 +1214,12 @@ class ACIRValidator:
             modes = contract.get("modes", [])
             if not modes:
                 self._issue(1, Severity.WARNING, f"{path}.modes", "SANITIZE_NO_MODES",
-                           "C_SANITIZE sans 'modes' est inutile",
+                           "C_SANITIZE without 'modes' has no effect",
                            f"Add 'modes' with one or more of: {', '.join(sorted(valid_modes))}")
             for mode in modes:
                 if mode not in valid_modes:
                     self._issue(1, Severity.ERROR, f"{path}.modes", "SANITIZE_INVALID_MODE",
-                               f"Mode de sanitization inconnu: '{mode}'. "
+                               f"Unknown sanitization mode: '{mode}'. "
                                f"Accepted values: {', '.join(sorted(valid_modes))}")
 
         elif primitive == "C_ENCRYPT":
@@ -1212,7 +1227,7 @@ class ACIRValidator:
             algo = contract.get("algorithm", "aes_256_gcm")
             if algo not in valid_algos:
                 self._issue(1, Severity.ERROR, f"{path}.algorithm", "ENCRYPT_INVALID_ALGO",
-                           f"Algorithme de chiffrement inconnu: '{algo}'. "
+                           f"Unknown encryption algorithm: '{algo}'. "
                            f"Accepted values: {', '.join(sorted(valid_algos))}")
             if not contract.get("key_ref"):
                 self._issue(1, Severity.WARNING, f"{path}.key_ref", "ENCRYPT_NO_KEY_REF",
@@ -1462,7 +1477,7 @@ class ACIRValidator:
                            f"$.module.exposed[{i}]",
                            "MUTATION_NO_AUTH",
                            f"Endpoint {method} {route} modifies data "
-                           f"sans authentification requise",
+                           f"without requiring authentication",
                            "Add 'auth: { required: true, roles: [...] }' — "
                            "mutation endpoints must always be protected")
 
@@ -1489,7 +1504,7 @@ class ACIRValidator:
                                        f"$.module.exposed[{i}]",
                                        "SENSITIVE_DATA_NO_AUTH",
                                        f"Endpoint {method} {route} exposes "
-                                       f"sensibles ({ref}.{sens_field}) sans authentification",
+                                       f"sensitive data ({ref}.{sens_field}) without authentication",
                                        "Add 'auth: { required: true }' or use a "
                                        "DTO excluding the sensitive fields")
 
@@ -1518,7 +1533,7 @@ class ACIRValidator:
                                    f"'{output_ref}' directly — it contains "
                                    f"sensitive or internal fields that should not be exposed",
                                    "Create a response DTO excluding the sensitive "
-                                   "sensibles (password_hash, tokens, etc.)")
+                                   "fields (password_hash, tokens, etc.)")
 
         # ── Rule 5: Critical POST without idempotency ────────────────────
 
@@ -1537,7 +1552,7 @@ class ACIRValidator:
                                f"$.module.exposed[{i}]",
                                "CRITICAL_POST_NO_IDEMPOTENT",
                                f"POST endpoint {route} creates or modifies "
-                               f"critiques sans contrat d'idempotence",
+                               f"critical data without an idempotency contract",
                                "Add C_IDEMPOTENT to the handler to avoid "
                                "duplicates on network retries")
 
@@ -1777,7 +1792,7 @@ class ACIRValidator:
                         self._issue(5, Severity.WARNING, f"{path}.url",
                                    "INSECURE_HTTP_URL",
                                    f"Interpolated URL contains 'http://' — use HTTPS",
-                                   "Remplacer http:// par https://")
+                                   "Replace http:// with https://")
 
             # Recurse into steps, branches, etc.
             for key in ("body", "op"):
@@ -1816,7 +1831,7 @@ class ACIRValidator:
                                                f"{path}.error.message",
                                                "SENSITIVE_IN_ERROR_MSG",
                                                f"The error message references the "
-                                               f"sensible '{field}' — il pourrait fuiter "
+                                               f"sensitive field '{field}' — it could leak "
                                                f"in the HTTP response",
                                                "Do not include sensitive data in "
                                                "error messages")
@@ -2081,7 +2096,7 @@ class ACIRValidator:
                     "SCALAR_OUTPUT_ON_LIST_QUERY",
                     f"Unit '{unit.get('name')}' declares a scalar output ($ref: {output['$ref']}) "
                     f"but its IO_QUERY body lacks `single: true` or `limit: 1` — will return List<{output['$ref']}>",
-                    suggestion="Soit ajouter `single: true` au body, soit changer l'output en `D_COLLECTION` de cet entity",
+                    suggestion="Either add `single: true` to the body, or change the output to a `D_COLLECTION` of that entity",
                 )
 
         # Rule 2b — `IO_MUTATE.data` or `IO_QUERY.filter` references a field that
@@ -2344,7 +2359,7 @@ class ACIRValidator:
                         self._issue(
                             2, Severity.ERROR, path, "GENERATE_UNKNOWN_KIND",
                             f"`$generate: \"{g}\"` is not a recognized builtin (valid: {sorted(GENERATE_BUILTIN_KINDS)})",
-                            suggestion="Pour un format custom comme `ORD-YYYYMMDD-XXXX`, utiliser "
+                            suggestion="For a custom format like `ORD-YYYYMMDD-XXXX`, use "
                                        "{\"$generate\": {\"kind\": \"template\", \"format\": \"...\"}}",
                         )
                     elif isinstance(g, dict):
@@ -2392,7 +2407,7 @@ class ACIRValidator:
                         self._issue(
                             2, Severity.ERROR, path, "UNRESOLVED_REF",
                             f"`$ref: \"{ref}\"` points to no declared type or unit",
-                            suggestion=f"Types disponibles : {sorted(valid_refs)[:10]}... (voir module.types et module.units)",
+                            suggestion=f"Available types: {sorted(valid_refs)[:10]}... (see module.types and module.units)",
                         )
                 for k, v in node.items():
                     walk(v, f"{path}.{k}")
@@ -3051,8 +3066,10 @@ def validate_file(filepath: str) -> ValidationResult:
 
 
 def main():
+    force_utf8_output()
+
     if len(sys.argv) < 2:
-        print("Usage: python acir_validator.py <fichier.acir.json> [--verbose]")
+        print("Usage: python acir_validator.py <file.acir.json> [--verbose]")
         sys.exit(1)
 
     filepath = sys.argv[1]
