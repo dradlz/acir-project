@@ -265,16 +265,24 @@ class ACIRValidator:
         self.issues: list[ValidationIssue] = []
         self.type_registry: dict[str, dict] = {}
         self.unit_registry: dict[str, dict] = {}
-        self.stats: dict[str, int] = {
+        self.stats: dict[str, Any] = {
             "types": 0, "units": 0, "endpoints": 0,
             "contracts": 0, "pipelines": 0, "orchestrations": 0,
         }
+        # Did the normative JSON-Schema pass actually run?
+        #   True  → applied;  False → expected but skipped (degraded);
+        #   None  → not applicable (document is not v0.3).
+        # `passed_levels` alone cannot express this: level 1 still "passes"
+        # when the schema is skipped, so a bare 6/6 would overstate what was
+        # checked. Consumers must gate on this, not on the level count.
+        self.schema_validated: bool | None = None
 
     def validate(self, doc: dict) -> ValidationResult:
         """Run the full validation pipeline."""
         self.issues = []
         self.type_registry = {}
         self.unit_registry = {}
+        self.schema_validated = None
         self._doc_version = doc.get("acir_version") if isinstance(doc, dict) else None
 
         # Niveau 1 — Validation structurelle (dispatch v0.2 / v0.3). Le mode v0.3
@@ -330,16 +338,19 @@ class ACIRValidator:
     def _level1_jsonschema_v03(self, doc: dict):
         """Wire the formal JSON-Schema into the v0.3 structural pass."""
         if not _JSONSCHEMA_AVAILABLE:
+            self.schema_validated = False
             self._issue(1, Severity.WARNING, "$", "JSONSCHEMA_UNAVAILABLE",
                        "The `jsonschema` module is not installed — v0.3 structural pass degraded to manual checks only",
                        suggestion="pip install jsonschema==4.23.0")
             return
         schema = _load_v03_schema()
         if schema is None:
+            self.schema_validated = False
             self._issue(1, Severity.WARNING, "$", "SCHEMA_FILE_MISSING",
                        f"v0.3.0 JSON schema not found at {_V03_SCHEMA_PATH} — structural pass degraded",
                        suggestion="Check that docs/schemas/acir-v0.3.1.json exists")
             return
+        self.schema_validated = True
         validator = Draft202012Validator(schema)
 
         def _fmt_path(e) -> str:
@@ -419,6 +430,7 @@ class ACIRValidator:
     def _build_result(self, passed_level: int) -> ValidationResult:
         has_errors = any(i.severity == Severity.ERROR for i in self.issues)
         self.stats["passed_levels"] = passed_level
+        self.stats["schema_validated"] = self.schema_validated
         return ValidationResult(
             valid=not has_errors,
             issues=self.issues,
@@ -3078,11 +3090,17 @@ def main():
     result = validate_file(filepath)
     output = result.to_dict()
 
-    # Affichage
+    # Report. When the normative JSON-Schema pass was skipped, say so on the
+    # headline itself: level 1 still counts as passed, so a bare "6/6" would
+    # claim more than was actually checked.
+    degraded = ""
+    if output['stats'].get('schema_validated') is False:
+        degraded = " (level 1 degraded: normative JSON-Schema NOT applied)"
+
     if result.valid:
-        print(f"✅ ACIR VALID — {output['stats'].get('passed_levels', 0)}/6 levels passed")
+        print(f"✅ ACIR VALID — {output['stats'].get('passed_levels', 0)}/6 levels passed{degraded}")
     else:
-        print(f"❌ ACIR INVALID — stopped at level {output['stats'].get('passed_levels', 0)}")
+        print(f"❌ ACIR INVALID — stopped at level {output['stats'].get('passed_levels', 0)}{degraded}")
 
     print(f"\n📊 Summary: {output['summary']['errors']} errors, "
           f"{output['summary']['warnings']} warnings, "
