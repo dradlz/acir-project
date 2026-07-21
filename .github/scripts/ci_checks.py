@@ -11,6 +11,7 @@ exit 0. Pure standard library, Python 3.10+.
 """
 from __future__ import annotations
 
+import ast
 import json
 import os
 import subprocess
@@ -164,6 +165,59 @@ with tempfile.TemporaryDirectory() as tmp:
           (proc.stderr.strip().splitlines() or [""])[-1])
     check("mock generation writes a valid document",
           (tmp / "gen.json").exists() and validate(tmp / "gen.json").returncode == 0)
+
+
+# ── 5. The conformance corpus agrees with the reference validator ──────────
+#
+# The corpus is the contract offered to independent implementations. If the
+# reference validator drifts away from it, the contract is a lie.
+
+print("\nConformance suite")
+
+proc = run([str(REPO / "conformance" / "run.py")])
+check("conformance corpus passes", proc.returncode == 0,
+      (proc.stdout.strip().splitlines() or ["no output"])[-1])
+
+
+# ── 6. Schema and validator agree on the closed vocabularies ───────────────
+#
+# The validator derives its closed enums from the JSON-Schema and falls back
+# to hand-written constants when the schema file cannot be read. If the two
+# drift apart, the validator silently enforces a different vocabulary
+# depending on whether the schema was loaded — the same hazard the corpus
+# rules out for optional dependencies.
+
+print("\nSchema / constant drift")
+
+schema_doc = json.loads((REPO / "docs" / "schemas" / "acir-v0.3.1.json")
+                        .read_text(encoding="utf-8"))
+source = ast.parse((REPO / "validator" / "acir_validator.py")
+                   .read_text(encoding="utf-8"))
+
+derived = 0
+for node in ast.walk(source):
+    if not (isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Call)
+            and getattr(node.value.func, "id", "") == "_enum_from_schema"):
+        continue
+    name = node.targets[0].id
+    path, fallback = (ast.literal_eval(a) for a in node.value.args[:2])
+    derived += 1
+
+    cursor = schema_doc["$defs"]
+    try:
+        for key in path:
+            cursor = cursor[key]
+    except (KeyError, IndexError, TypeError):
+        check(f"{name} resolves in the schema", False, f"dead path {path}")
+        continue
+
+    only_schema = set(cursor) - set(fallback)
+    only_code = set(fallback) - set(cursor)
+    check(f"{name} matches the schema", not (only_schema or only_code),
+          f"schema only: {sorted(only_schema)}; fallback only: {sorted(only_code)}")
+
+check("every derived enum was checked", derived > 0, f"found {derived}")
 
 
 print(f"\njsonschema installed: {HAS_JSONSCHEMA}")

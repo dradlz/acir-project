@@ -12,7 +12,9 @@ Thanks for being here. ACIR only becomes a real standard if people other than it
 
 **Build a compiler for a new target.** Open an issue first with the label `new-target` so we can help and avoid duplicate efforts. New targets do **not** require an RFC — the spec is the contract, the target is an implementation of it.
 
-**Build an independent implementation.** Validators or compilers in other languages are explicitly encouraged. You don't need permission. If you want your implementation listed in the README, open a PR adding it once it passes the examples in `examples/`.
+**Build an independent implementation.** Validators or compilers in other languages are explicitly encouraged. You don't need permission. Check yourself against [`conformance/`](conformance/README.md) — `python conformance/run.py --validator "your command"` — and if you want your implementation listed in the README, open a PR once it passes.
+
+**Add a conformance case.** The corpus in `conformance/` pins down far less than the validator enforces, and every case added is one more thing an independent implementation can be held to. See [`conformance/README.md`](conformance/README.md) for how to write one; this is currently one of the most useful contributions available.
 
 **Propose a change to the format itself.** That's an RFC — see [rfcs/README.md](rfcs/README.md). When in doubt whether your idea needs one, open an issue and ask; worst case we'll say "just send a PR."
 

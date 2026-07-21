@@ -1,0 +1,147 @@
+{
+  "conformance_version": "0.3.1",
+  "description": "Conformance corpus for ACIR 0.3.x. See README.md for the rules.",
+  "cases": [
+    {
+      "id": "valid/minimal-module",
+      "document": "cases/valid/minimal-module.acir.json",
+      "note": "The smallest accepted module: a version, a name, one type, no behaviour.",
+      "expect": {
+        "valid": true,
+        "issues": []
+      }
+    },
+    {
+      "id": "valid/read-endpoint",
+      "document": "cases/valid/read-endpoint.acir.json",
+      "note": "A public read endpoint. Nothing to flag: reads need no auth, and the rate limit satisfies the public-endpoint rule.",
+      "expect": {
+        "valid": true,
+        "issues": []
+      }
+    },
+    {
+      "id": "valid/authenticated-mutation",
+      "document": "cases/valid/authenticated-mutation.acir.json",
+      "note": "A mutation endpoint with auth and a rate limit \u2014 the shape every level 5 security rule is happy with.",
+      "expect": {
+        "valid": true,
+        "issues": []
+      }
+    },
+    {
+      "id": "valid/project-manifest",
+      "document": "cases/valid/project-manifest.acir.json",
+      "note": "A project manifest with one inlined component. Only levels 1 and 2 apply to this document kind.",
+      "expect": {
+        "valid": true,
+        "issues": []
+      }
+    },
+    {
+      "id": "invalid/unknown-primitive",
+      "document": "cases/invalid/unknown-primitive.acir.json",
+      "note": "`D_BOGUS` is not a primitive. Closed vocabularies are the point: an implementation that accepts unknown primitives is not conforming.",
+      "expect": {
+        "valid": false,
+        "issues": [
+          {
+            "code": "INVALID_PRIMITIVE",
+            "level": 1,
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid/query-filters-non-canonical",
+      "document": "cases/invalid/query-filters-non-canonical.acir.json",
+      "note": "`filters` (array) is a synonym of the canonical `filter` (object map). One form per pattern \u2014 synonyms are rejected, never tolerated.",
+      "expect": {
+        "valid": false,
+        "issues": [
+          {
+            "code": "QUERY_FILTERS_NON_CANONICAL",
+            "level": 1,
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid/ref-param-non-canonical",
+      "document": "cases/invalid/ref-param-non-canonical.acir.json",
+      "note": "`$param` is a synonym of the canonical `$input`.",
+      "expect": {
+        "valid": false,
+        "issues": [
+          {
+            "code": "REF_PARAM_NON_CANONICAL",
+            "level": 1,
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid/unresolved-ref",
+      "document": "cases/invalid/unresolved-ref.acir.json",
+      "note": "A `$ref` pointing at no declared type or unit. Structurally fine, semantically broken \u2014 this is what level 2 exists for.",
+      "expect": {
+        "valid": false,
+        "issues": [
+          {
+            "code": "UNRESOLVED_REF",
+            "level": 2,
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid/auth-in-public-route",
+      "document": "cases/invalid/auth-in-public-route.acir.json",
+      "note": "The unit reads `$auth`, but its endpoint does not require authentication: at runtime there is no token to read from.",
+      "expect": {
+        "valid": false,
+        "issues": [
+          {
+            "code": "AUTH_IN_PUBLIC_ROUTE",
+            "level": 2,
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
+      "id": "invalid/delete-without-auth",
+      "document": "cases/invalid/delete-without-auth.acir.json",
+      "note": "An unauthenticated DELETE. Pair this with `warning/mutation-without-auth`: same rule, same code, but DELETE is blocking where POST only warns. Severity is part of the contract.",
+      "expect": {
+        "valid": false,
+        "issues": [
+          {
+            "code": "MUTATION_NO_AUTH",
+            "level": 5,
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
+      "id": "warning/mutation-without-auth",
+      "document": "cases/warning/mutation-without-auth.acir.json",
+      "note": "An unauthenticated POST. Accepted, but it must be reported: an implementation that stays silent here is not conforming, even though it agrees on the verdict.",
+      "expect": {
+        "valid": true,
+        "issues": [
+          {
+            "code": "MUTATION_NO_AUTH",
+            "level": 5,
+            "severity": "warning"
+          }
+        ]
+      }
+    }
+  ]
+}
