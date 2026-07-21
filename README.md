@@ -2,6 +2,8 @@
 
 **A vendor-neutral, validated intermediate format between LLMs and production code.**
 
+[![CI](https://github.com/dradlz/acir-project/actions/workflows/ci.yml/badge.svg)](https://github.com/dradlz/acir-project/actions/workflows/ci.yml)
+
 Any LLM writes it. A six-level validator checks it — structure, semantics, contracts, target compatibility, security, integration. Deterministic compilers turn it into production-grade code. Same document in, same code out — byte for byte, every time.
 
 ```
@@ -42,7 +44,7 @@ ACIR proposes to complete the chain, borrowing a pattern that industries like ED
 | **JSON Schema** | [`docs/schemas/acir-v0.3.1.json`](docs/schemas/acir-v0.3.1.json) — normative shapes, Draft 2020-12, closed enums, `additionalProperties: false` | Normative |
 | **Validator** | [`validator/`](validator/README.md) — the 6-level reference validator, including the 15 security rules. Single-file Python; optional `jsonschema` dependency for the schema pass | Working |
 | **Generation tool** | [`tools/generate.py`](tools/README.md) — brief → LLM (Anthropic / OpenAI / Mistral, your key) → validated document, with automatic error-feedback retries; offline mock mode for CI | Working |
-| **Examples** | [`examples/`](examples/README.md) — a stress-test e-commerce module, and a 3-microservice project manifest mixing Java/Quarkus, TypeScript/Fastify, and Python/FastAPI in one system | Validating 6/6 |
+| **Examples** | [`examples/`](examples/README.md) — a stress-test e-commerce module, and a 3-microservice project manifest mixing Java/Quarkus, TypeScript/Fastify, and Python/FastAPI in one system | Validating 6/6 · 2/2 |
 
 **Not published yet, coming next:** the deterministic compilers (Java/Quarkus, TypeScript/Fastify, Python/FastAPI, and the infrastructure compiler that derives Docker/compose from project manifests). They exist and are stable — they are being extracted from the platform codebase for standalone publication. Publishing the spec and validator first is deliberate: the format is the standard; compilers are implementations of it, and we want independent ones to be possible from day one.
 
@@ -50,7 +52,7 @@ ACIR proposes to complete the chain, borrowing a pattern that industries like ED
 
 ```bash
 git clone https://github.com/dradlz/acir-project.git && cd acir-project
-pip install jsonschema   # optional, enables the JSON-Schema pass
+pip install jsonschema   # optional, enables the JSON-Schema pass  (Python 3.10+)
 
 python validator/acir_validator.py examples/ecommerce-v0.3.acir.json
 # ✅ ACIR VALID — 6/6 levels passed

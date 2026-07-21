@@ -1,6 +1,7 @@
 # Examples
 
-Real ACIR documents, validating 6/6 against the current validator. They double as the de facto conformance material for independent implementations.
+Real ACIR documents, validating cleanly against the current validator — the module
+against all six levels, the project manifest against the two that apply to it. They double as the de facto conformance material for independent implementations.
 
 | File | Kind | What it demonstrates |
 |---|---|---|
