@@ -1,7 +1,12 @@
 # Examples
 
 Real ACIR documents, validating cleanly against the current validator — the module
-against all six levels, the project manifest against the two that apply to it. They double as the de facto conformance material for independent implementations.
+against all six levels, the project manifest against the two that apply to it.
+
+These are demonstrations, deliberately large: they show what a realistic document
+looks like. If you are building an independent implementation and want something
+to check yourself against, use [`conformance/`](../conformance/README.md) instead —
+small documents, one rule each, with the expected verdict written down.
 
 | File | Kind | What it demonstrates |
 |---|---|---|

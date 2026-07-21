@@ -1,0 +1,84 @@
+{
+  "acir_version": "0.3.1",
+  "module": {
+    "name": "Fixture",
+    "types": [
+      {
+        "name": "Thing",
+        "primitive": "D_RECORD",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          }
+        ]
+      }
+    ],
+    "units": [
+      {
+        "primitive": "X_UNIT",
+        "name": "createThing",
+        "input": {
+          "primitive": "D_RECORD",
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "primitive": "D_SCALAR",
+                "kind": "uuid"
+              }
+            }
+          ]
+        },
+        "output": {
+          "$ref": "Thing"
+        },
+        "body": {
+          "primitive": "IO_MUTATE",
+          "entity": "things",
+          "action": "create",
+          "data": {
+            "id": {
+              "$input": "id"
+            }
+          }
+        }
+      }
+    ],
+    "exposed": [
+      {
+        "primitive": "IO_EXPOSE",
+        "kind": "http_endpoint",
+        "route": "/things",
+        "method": "POST",
+        "input": {
+          "primitive": "D_RECORD",
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "primitive": "D_SCALAR",
+                "kind": "uuid"
+              }
+            }
+          ]
+        },
+        "input_source": "body",
+        "output": {
+          "$ref": "Thing"
+        },
+        "handler": {
+          "$ref": "createThing"
+        },
+        "rate_limit": {
+          "limit": 100,
+          "window": "PT1M",
+          "scope": "per_ip"
+        }
+      }
+    ]
+  }
+}

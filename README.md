@@ -45,6 +45,7 @@ ACIR proposes to complete the chain, borrowing a pattern that industries like ED
 | **Validator** | [`validator/`](validator/README.md) — the 6-level reference validator, including the 15 security rules. Single-file Python; optional `jsonschema` dependency for the schema pass | Working |
 | **Generation tool** | [`tools/generate.py`](tools/README.md) — brief → LLM (Anthropic / OpenAI / Mistral, your key) → validated document, with automatic error-feedback retries; offline mock mode for CI | Working |
 | **Examples** | [`examples/`](examples/README.md) — a stress-test e-commerce module, and a 3-microservice project manifest mixing Java/Quarkus, TypeScript/Fastify, and Python/FastAPI in one system | Validating 6/6 · 2/2 |
+| **Conformance suite** | [`conformance/`](conformance/README.md) — small documents with the verdict each must receive, as language-agnostic JSON. Point it at your own implementation to prove it agrees with this one | 11 cases |
 
 **Not published yet, coming next:** the deterministic compilers (Java/Quarkus, TypeScript/Fastify, Python/FastAPI, and the infrastructure compiler that derives Docker/compose from project manifests). They exist and are stable — they are being extracted from the platform codebase for standalone publication. Publishing the spec and validator first is deliberate: the format is the standard; compilers are implementations of it, and we want independent ones to be possible from day one.
 

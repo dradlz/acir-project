@@ -131,7 +131,7 @@ VALID_PRIMITIVES = {
 # docs/ACIR-CANONICAL-COMPLETENESS.md). Do NOT hand-copy these values anymore:
 # they are assigned below via `_enum_from_schema()` (after the schema
 # loader), with a fallback = the reconciled canon in case the schema is
-# absent. The tests/conformance/ gate checks schema == constants.
+# absent. `.github/scripts/ci_checks.py` gates schema == constants.
 # Constants concerned: SCALAR_KINDS, SOURCE_KINDS, HTTP_METHODS, EXPOSE_KINDS,
 # MUTATE_ACTIONS, ERROR_KINDS, GENERATE_BUILTIN_KINDS.
 
@@ -219,8 +219,8 @@ def _load_v03_schema() -> dict | None:
 # ─── WS0: closed enums derived from the schema (single source of truth) ─────────────
 # cf. docs/ACIR-CANONICAL-COMPLETENESS.md. Le validateur ne recopie plus les
 # enums: it reads them from the JSON-schema. Fallback = reconciled canon (if the
-# schema is absent, the validator stays functional offline). The
-# tests/conformance/ gate breaks if schema and constants diverge.
+# schema is absent, the validator stays functional offline).
+# `.github/scripts/ci_checks.py` fails if schema and constants diverge.
 
 def _enum_from_schema(path: tuple, fallback: set) -> set:
     """Reads a closed enum under schema["$defs"] via `path` (keys + list indices)."""

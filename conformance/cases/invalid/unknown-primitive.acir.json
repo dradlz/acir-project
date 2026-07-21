@@ -1,0 +1,87 @@
+{
+  "acir_version": "0.3.1",
+  "module": {
+    "name": "Fixture",
+    "types": [
+      {
+        "name": "Thing",
+        "primitive": "D_BOGUS",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "primitive": "D_SCALAR",
+              "kind": "uuid"
+            }
+          }
+        ]
+      }
+    ],
+    "units": [
+      {
+        "primitive": "X_UNIT",
+        "name": "getThing",
+        "input": {
+          "primitive": "D_RECORD",
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "primitive": "D_SCALAR",
+                "kind": "uuid"
+              }
+            }
+          ]
+        },
+        "output": {
+          "$ref": "Thing"
+        },
+        "body": {
+          "primitive": "IO_QUERY",
+          "entity": "things",
+          "filter": {
+            "id": {
+              "operator": "eq",
+              "value": {
+                "$input": "id"
+              }
+            }
+          },
+          "single": true
+        }
+      }
+    ],
+    "exposed": [
+      {
+        "primitive": "IO_EXPOSE",
+        "kind": "http_endpoint",
+        "route": "/things/{id}",
+        "method": "GET",
+        "input": {
+          "primitive": "D_RECORD",
+          "fields": [
+            {
+              "name": "id",
+              "type": {
+                "primitive": "D_SCALAR",
+                "kind": "uuid"
+              }
+            }
+          ]
+        },
+        "input_source": "path",
+        "output": {
+          "$ref": "Thing"
+        },
+        "handler": {
+          "$ref": "getThing"
+        },
+        "rate_limit": {
+          "limit": 100,
+          "window": "PT1M",
+          "scope": "per_ip"
+        }
+      }
+    ]
+  }
+}
