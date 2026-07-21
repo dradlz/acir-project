@@ -276,6 +276,7 @@ class ACIRValidator:
         # when the schema is skipped, so a bare 6/6 would overstate what was
         # checked. Consumers must gate on this, not on the level count.
         self.schema_validated: bool | None = None
+        self._acir_kind: str = "module"
 
     def validate(self, doc: dict) -> ValidationResult:
         """Run the full validation pipeline."""
@@ -283,6 +284,7 @@ class ACIRValidator:
         self.type_registry = {}
         self.unit_registry = {}
         self.schema_validated = None
+        self._acir_kind = "module"
         self._doc_version = doc.get("acir_version") if isinstance(doc, dict) else None
 
         # Niveau 1 — Validation structurelle (dispatch v0.2 / v0.3). Le mode v0.3
@@ -298,11 +300,15 @@ class ACIRValidator:
         # Keep the level-1 JSON-schema (covers the project kind) then a
         # dedicated project pass (inline component recursion + deps graph).
         acir_kind = doc.get("acir_kind", "module") if isinstance(doc, dict) else "module"
+        self._acir_kind = acir_kind
         if acir_kind == "project":
+            # A project manifest has its own, shorter pipeline: the schema pass
+            # then the project pass. Levels 3-6 assume `doc["module"]` and are
+            # not applicable — so the denominator here is 2, not 6.
             if any(i.severity == Severity.ERROR for i in self.issues):
-                return self._build_result(passed_level=1)
+                return self._build_result(passed_level=1, total_levels=2)
             self._level_project(doc)
-            return self._build_result(passed_level=2)
+            return self._build_result(passed_level=2, total_levels=2)
 
         self._level1_structural(doc)
         l1_errors = sum(1 for i in self.issues if i.severity == Severity.ERROR)
@@ -427,9 +433,11 @@ class ACIRValidator:
             seen.add(key)
             self._issue(1, Severity.ERROR, path, code, msg)
 
-    def _build_result(self, passed_level: int) -> ValidationResult:
+    def _build_result(self, passed_level: int, total_levels: int = 6) -> ValidationResult:
         has_errors = any(i.severity == Severity.ERROR for i in self.issues)
+        self.stats["acir_kind"] = self._acir_kind
         self.stats["passed_levels"] = passed_level
+        self.stats["total_levels"] = total_levels
         self.stats["schema_validated"] = self.schema_validated
         return ValidationResult(
             valid=not has_errors,
@@ -448,6 +456,7 @@ class ACIRValidator:
         project = doc.get("project", {}) if isinstance(doc, dict) else {}
         components = project.get("components", []) or []
         name_set = {c.get("name") for c in components if c.get("name")}
+        self.stats["components"] = len(components)
 
         # Dependency graph + references
         graph: dict[str, list] = {}
@@ -3097,8 +3106,9 @@ def main():
     if output['stats'].get('schema_validated') is False:
         degraded = " (level 1 degraded: normative JSON-Schema NOT applied)"
 
+    total = output['stats'].get('total_levels', 6)
     if result.valid:
-        print(f"✅ ACIR VALID — {output['stats'].get('passed_levels', 0)}/6 levels passed{degraded}")
+        print(f"✅ ACIR VALID — {output['stats'].get('passed_levels', 0)}/{total} levels passed{degraded}")
     else:
         print(f"❌ ACIR INVALID — stopped at level {output['stats'].get('passed_levels', 0)}{degraded}")
 
@@ -3108,8 +3118,17 @@ def main():
 
     if output['stats']:
         s = output['stats']
-        print(f"📦 Module: {s.get('types', 0)} types, {s.get('units', 0)} units, "
-              f"{s.get('endpoints', 0)} endpoints, {s.get('contracts', 0)} contracts")
+        # A project manifest carries components, not types/units/endpoints —
+        # printing the module counters there just shows a row of zeros.
+        if s.get('acir_kind') == "project":
+            # Absent when validation stopped before the project pass ran —
+            # print nothing rather than a misleading zero.
+            n = s.get('components')
+            if n is not None:
+                print(f"📦 Project: {n} component{'' if n == 1 else 's'}")
+        else:
+            print(f"📦 Module: {s.get('types', 0)} types, {s.get('units', 0)} units, "
+                  f"{s.get('endpoints', 0)} endpoints, {s.get('contracts', 0)} contracts")
 
     if verbose or not result.valid:
         print("\n─── Details ───")
