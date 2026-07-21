@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: ${{ matrix.os }} · py${{ matrix.python }} · jsonschema=${{ matrix.jsonschema }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is not optional: the reports use characters a legacy code
+        # page cannot encode, and that only ever surfaced there.
+        os: [ubuntu-latest, windows-latest]
+        # 3.10 is the real floor — the validator uses `X | None` at module
+        # level and in signatures, which is evaluated at import time.
+        python: ['3.10', '3.13']
+        jsonschema: [true]
+        include:
+          # `jsonschema` is an optional dependency, so the degraded path is a
+          # supported configuration and needs its own coverage: it asserts the
+          # run reports the schema pass as skipped rather than claiming 6/6.
+          - os: ubuntu-latest
+            python: '3.13'
+            jsonschema: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install jsonschema
+        if: matrix.jsonschema
+        run: pip install jsonschema==4.23.0
+
+      - name: Repository checks
+        run: python .github/scripts/ci_checks.py
+
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Every commit carries a Signed-off-by line
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          missing=$(git log --no-merges --format='%h %s' \
+                      --invert-grep --grep='^Signed-off-by: ' "$BASE..$HEAD")
+          if [ -n "$missing" ]; then
+            echo "These commits have no Signed-off-by line:"
+            echo "$missing"
+            echo
+            echo "See CONTRIBUTING.md. To sign off the whole branch:"
+            echo "  git rebase --signoff $BASE"
+            exit 1
+          fi
+          echo "All commits signed off."

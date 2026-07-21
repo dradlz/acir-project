@@ -24,6 +24,22 @@ Thanks for being here. ACIR only becomes a real standard if people other than it
 - Generated-code changes must include the updated expected outputs so diffs stay reviewable.
 - New behavior needs tests. Bug fixes need a test that fails without the fix.
 
+## Running the checks
+
+CI runs one script; run the same one locally before opening a PR:
+
+```bash
+python .github/scripts/ci_checks.py
+```
+
+It validates both examples, asserts on the machine-readable `--json` output
+rather than on exit codes alone, checks that invalid documents are still
+rejected, and exercises the reports under a legacy console encoding. Standard
+library only, Python 3.10+.
+
+Run it twice — with and without `jsonschema` installed. Both are supported
+configurations, and only the second one exercises the degraded schema pass.
+
 ## Developer Certificate of Origin (DCO)
 
 We use the [DCO](https://developercertificate.org/) instead of a CLA. It's a simple statement that you have the right to submit your contribution under Apache 2.0.
