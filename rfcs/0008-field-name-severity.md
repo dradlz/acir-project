@@ -1,8 +1,8 @@
-# RFC 0000 — Settle the severity of a non-`snake_case` field name
+# RFC 0008 — Settle the severity of a non-`snake_case` field name
 
 - **Status:** Draft
 - **Author(s):** @dradlz
-- **Discussion PR:** (filled after opening the PR)
+- **Discussion PR:** https://github.com/dradlz/acir-project/pull/8
 - **Spec version target:** 0.3.2
 
 ## Summary
