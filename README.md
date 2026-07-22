@@ -52,13 +52,37 @@ ACIR proposes to complete the chain, borrowing a pattern that industries like ED
 
 ## Try it now
 
+Requires Python 3.10+.
+
+**Validate** a document:
+
 ```bash
 git clone https://github.com/dradlz/acir-project.git && cd acir-project
-pip install jsonschema   # optional, enables the JSON-Schema pass  (Python 3.10+)
+pip install jsonschema   # optional; without it the normative schema pass is skipped
 
 python validator/acir_validator.py examples/ecommerce-v0.3.acir.json
 # ✅ ACIR VALID — 6/6 levels passed
 ```
+
+**Compile it** to a running FastAPI project:
+
+```bash
+python compilers/acir_compiler_fastapi.py examples/ecommerce-v0.3.acir.json ./out
+# 🎉 27 files generated
+```
+
+**Check that the compilation is reproducible** — the claim this whole project
+rests on:
+
+```bash
+python compilers/determinism_check.py
+# Deterministic.
+```
+
+It compiles the document several times under conditions that have actually
+broken reproducibility before — a different hash seed, a different filesystem
+encoding — and compares every run against a hash committed in the repository.
+CI runs it on Linux and Windows, so the two are checked against each other.
 
 Generate your own document from a brief, with any LLM (your key, read from env):
 
@@ -70,7 +94,19 @@ python tools/generate.py --provider anthropic \
 
 The tool validates every response and feeds errors back to the model until the document passes — the generate→validate→correct loop this project is about, in one command. See [tools/README.md](tools/README.md).
 
-Then open the example and break it on purpose: remove the `auth` block from a POST endpoint and re-validate — watch `MUTATION_NO_AUTH` block the document at level 5. That is the project's core claim in one command: **a document that would compile into insecure code does not validate.**
+Then break the example on purpose. Remove the `auth` block from the `POST /orders` endpoint and re-validate:
+
+```
+❌ ACIR INVALID — stopped at level 2
+
+  ❌ [L2] AUTH_IN_PUBLIC_ROUTE
+     $.module.units[name=createOrder]
+     Unit 'createOrder' uses $auth but its endpoint lacks `auth.required: true`
+```
+
+Validation stops before the compiler ever sees the document. Note what caught it: not a lint rule about missing auth, but a *semantic contradiction*. The unit reads the caller's identity out of a JWT, and the endpoint no longer requires one — at runtime there would be no token to read. That is the project's core claim, in one command: **a document that would compile into broken or insecure code does not validate.**
+
+Level 5 carries the blunter rules too — an unauthenticated `DELETE` is rejected outright, an unauthenticated `POST` is reported as a warning. Both cases are pinned in [`conformance/`](conformance/README.md), which is also where you check an independent implementation against this one.
 
 You can write ACIR by hand (start from the examples) or have any LLM produce it — the format is designed as an LLM target: strict canonical forms, closed enums, no synonyms, so the same brief converges to the same document.
 
