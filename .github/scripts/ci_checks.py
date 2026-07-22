@@ -189,7 +189,7 @@ check("conformance corpus passes", proc.returncode == 0,
 
 print("\nSchema / constant drift")
 
-schema_doc = json.loads((REPO / "docs" / "schemas" / "acir-v0.3.1.json")
+schema_doc = json.loads((REPO / "docs" / "schemas" / "acir-v0.3.2.json")
                         .read_text(encoding="utf-8"))
 source = ast.parse((REPO / "validator" / "acir_validator.py")
                    .read_text(encoding="utf-8"))

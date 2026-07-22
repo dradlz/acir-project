@@ -4,7 +4,7 @@
 
 The ACIR specification is defined by two artifacts, in this order of authority:
 
-1. **The JSON Schema** — [`../docs/schemas/acir-v0.3.1.json`](../docs/schemas/acir-v0.3.1.json) (Draft 2020-12). It defines the shapes: closed enums, required fields, `additionalProperties: false` everywhere. If the schema rejects a document, the document is not ACIR.
+1. **The JSON Schema** — [`../docs/schemas/acir-v0.3.2.json`](../docs/schemas/acir-v0.3.2.json) (Draft 2020-12). It defines the shapes: closed enums, required fields, `additionalProperties: false` everywhere. If the schema rejects a document, the document is not ACIR.
 2. **The semantic rules of the validator** — [`../validator/acir_validator.py`](../validator/acir_validator.py), levels 2–6: `$ref` resolution, type compatibility, contract satisfiability, the `$calculate` DSL, target compatibility, security analysis, and cross-module integration. The schema says what a document *looks like*; the validator says what it *means* and whether it is safe.
 
 A document is **conformant** when it passes both. Anything else in this repository (prose, examples, historical documents) is explanatory, not normative.
@@ -42,7 +42,7 @@ ACIR admits **exactly one shape** for each pattern — synonym keys are rejected
 
 ## Versioning
 
-Current specification line: **v0.3.x** (schema `acir-v0.3.1.json`; the validator tracks 0.3.2 and keeps back-compatibility with 0.2.0 documents). Semantic versioning applies — see the [RFC process](../rfcs/README.md) for how the specification evolves.
+Current specification line: **v0.3.x** (schema `acir-v0.3.2.json`; the validator tracks 0.3.2 and keeps back-compatibility with 0.2.0 documents). Semantic versioning applies — see the [RFC process](../rfcs/README.md) for how the specification evolves.
 
 ## Changing the specification
 
