@@ -43,6 +43,13 @@ jobs:
       - name: Repository checks
         run: python .github/scripts/ci_checks.py
 
+      # Run on every OS in the matrix and compared against a committed hash,
+      # so Linux and Windows are checked against each other rather than each
+      # against itself. Byte-for-byte reproducibility is the project's central
+      # claim; this is what makes it falsifiable.
+      - name: Compiler determinism
+        run: python compilers/determinism_check.py
+
   dco:
     name: DCO sign-off
     if: github.event_name == 'pull_request'
