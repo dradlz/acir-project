@@ -50,6 +50,24 @@ jobs:
       - name: Compiler determinism
         run: python compilers/determinism_check.py
 
+  # Separate from `checks` because it needs the network and about a minute: it
+  # installs the generated project's dependencies. One OS is enough — this
+  # asks whether the generated code *works*, which does not vary by platform
+  # the way byte-for-byte output does (that is `determinism_check.py`, which
+  # runs on every OS in the matrix above).
+  generated-project:
+    name: Generated project runs its own tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Compile, install, run the generated test suite
+        run: python compilers/e2e_check.py
+
   dco:
     name: DCO sign-off
     if: github.event_name == 'pull_request'

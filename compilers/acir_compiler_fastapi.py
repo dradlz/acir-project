@@ -202,7 +202,7 @@ class ACIRToFastAPICompiler:
         # Generate all files
         self._generate_requirements()
         self._generate_env(module)
-        self._generate_database()
+        self._generate_database(module)
         self._generate_models(module)
         self._generate_schemas(module)
         self._generate_errors()
@@ -278,9 +278,14 @@ pytest-asyncio==0.24.0
 
     # ─── database.py ───────────────────────────────────────────────────────
 
-    def _generate_database(self):
+    def _generate_database(self, module: dict):
+        # The database name is interpolated here. It used to sit in a plain
+        # string, so every generated project shipped a default connection
+        # string containing a literal `{snake}` — an unusable default that
+        # only surfaced for someone starting the app without DATABASE_URL set.
+        snake = to_snake(module.get("name", "app"))
         self._add_file("app/__init__.py", "")
-        self._add_file("app/database.py", '''"""ACIR Generated — Database configuration."""
+        self._add_file("app/database.py", f'''"""ACIR Generated — Database configuration."""
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
@@ -4246,7 +4251,7 @@ async def test_{fn_name}_not_found(client{auth_arg}):
                 anon_body_kw = f", json={valid_body}" if method in ("post", "put", "patch") and valid_body else ""
                 test_cases.append(f'''
 async def test_{fn_name}_unauthenticated(client):
-    """{method.upper()} {route} — sans token (401)."""
+    """{method.upper()} {route} — without a token (401)."""
     response = await client.{method}("{test_route_anon}"{anon_body_kw})
     assert response.status_code == 401
 ''')
@@ -4280,19 +4285,35 @@ async def test_health(client):
 
         tests_str = "\n".join(test_cases)
 
-        # Build the auth_token fixture only when auth is needed AND a role is declared.
-        # Brief 1 (TODO list) has JWT but no role labels — skip the fixture rather than crash.
+        # The `auth_headers` fixture must exist whenever any test asks for it,
+        # and the tests ask for it based on `needs_auth` alone. Gating the
+        # fixture on `all_roles` as well used to leave documents that declare
+        # auth without roles emitting tests that reference a fixture nobody
+        # defined — every authenticated test errored on collection.
+        #
+        # With no roles, the application registers an implicit `user`/`user`
+        # account (see _generate_auth), so the fixture logs in as that.
         auth_fixture = ""
-        if self.has_auth and self.all_roles:
-            primary_role = sorted(self.all_roles)[0]
-            primary_user = primary_role.lower().replace("_", "")
+        auth_env = ""
+        if self.has_auth:
+            if self.all_roles:
+                primary_role = sorted(self.all_roles)[0]
+                primary_user = primary_role.lower().replace("_", "")
+            else:
+                primary_role = primary_user = "user"
+            env_var = f"AUTH_USER_{primary_role.upper()}_PASSWORD"
+            # Seeded before the app is imported: accounts are only registered
+            # when the variable is set, so without this the login the fixture
+            # performs returns 401 and every authenticated test fails.
+            auth_env = (f'\nos.environ.setdefault("{env_var}", "test-password")'
+                        f'  # seeds the account the fixture logs in as\n')
             auth_fixture = f'''
 
 @pytest_asyncio.fixture
 async def auth_headers(client):
-    """Bearer token for the primary admin/role user, hydrated from AUTH_USER_<ROLE>_PASSWORD."""
+    """Bearer token for the account seeded in this module's environment."""
     import os
-    pw = os.environ.get("AUTH_USER_{primary_role.upper()}_PASSWORD", "admin123")
+    pw = os.environ["{env_var}"]
     resp = await client.post("/auth/login", json={{"username": "{primary_user}", "password": pw}})
     assert resp.status_code == 200, f"Login failed: {{resp.text}}"
     return {{"Authorization": f"Bearer {{resp.json()['token']}}"}}
@@ -4309,7 +4330,7 @@ import os
 # IMPORTANT: override DATABASE_URL BEFORE importing the app modules so they
 # bind their engine to the test SQLite file.
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
-
+{auth_env}
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
