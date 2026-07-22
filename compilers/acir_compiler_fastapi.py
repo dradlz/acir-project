@@ -4786,7 +4786,7 @@ CMD ["sh", "-c", "set -e; ls alembic/versions/*.py >/dev/null 2>&1 || alembic re
 
 def compile_file(input_path: str, output_dir: str) -> int:
     try:
-        with open(input_path, 'r') as f:
+        with open(input_path, 'r', encoding='utf-8') as f:
             doc = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError) as e:
         print(f"❌ Erreur: {e}")
@@ -4823,7 +4823,12 @@ def compile_file(input_path: str, output_dir: str) -> int:
         if os.path.commonpath([out_root, os.path.realpath(full_path)]) != out_root:
             raise ValueError(f"Chemin de sortie hors du répertoire cible refusé : {path!r}")
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
-        with open(full_path, 'w') as f:
+        # Encoding and line ending are pinned, not inherited. Without them the
+        # same document produces different bytes on different machines: the
+        # platform default encoding varies, and Python translates '\n' to
+        # '\r\n' on Windows. Byte-for-byte reproducibility is the guarantee
+        # this compiler exists to make.
+        with open(full_path, 'w', encoding='utf-8', newline='\n') as f:
             f.write(content)
         print(f"   ✅ {path}")
 
@@ -4834,7 +4839,21 @@ def compile_file(input_path: str, output_dir: str) -> int:
     return 0
 
 
+def _force_utf8_output() -> None:
+    """Make stdout/stderr UTF-8 so the progress report renders anywhere.
+
+    Windows consoles default to a legacy code page that cannot encode the
+    status characters used below. Entry point only: importing this module
+    leaves the caller's streams alone.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
+
 def main():
+    _force_utf8_output()
+
     if len(sys.argv) < 2:
         print("Usage: python acir_compiler_fastapi.py <input.acir.json> [output_dir]")
         sys.exit(1)
