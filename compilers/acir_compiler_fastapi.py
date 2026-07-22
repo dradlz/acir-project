@@ -912,25 +912,25 @@ class AcirError(Exception):
 
 class NotFoundError(AcirError):
     def __init__(self, resource: str, id: str = ""):
-        super().__init__("not_found", f"{resource} non trouvé" + (f" (id={id})" if id else ""), 404)
+        super().__init__("not_found", f"{resource} not found" + (f" (id={id})" if id else ""), 404)
 
 class ConflictError(AcirError):
-    def __init__(self, message: str = "Conflit — la ressource existe déjà"):
+    def __init__(self, message: str = "Conflict - the resource already exists"):
         super().__init__("conflict", message, 409)
 
 class ValidationError(AcirError):
-    def __init__(self, message: str = "Données invalides"):
+    def __init__(self, message: str = "Invalid data"):
         super().__init__("validation_failed", message, 422)
 
 class ForbiddenError(AcirError):
     def __init__(self):
-        super().__init__("forbidden", "Accès interdit", 403)
+        super().__init__("forbidden", "Access denied", 403)
 
 class UnauthorizedError(AcirError):
-    """HTTP 401 — credentials manquantes ou invalides (login fail typiquement).
-    Distinct de ForbiddenError (403, auth OK mais role insuffisant) et
-    de NotFoundError (404, ressource publique inexistante)."""
-    def __init__(self, message: str = "Identifiants invalides"):
+    """HTTP 401 - missing or invalid credentials (typically a failed login).
+    Distinct from ForbiddenError (403, authenticated but insufficient role)
+    and NotFoundError (404, public resource that does not exist)."""
+    def __init__(self, message: str = "Invalid credentials"):
         super().__init__("unauthorized", message, 401)
 
 
@@ -943,7 +943,7 @@ async def catch_all_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(status_code=500, content={
         "kind": "internal_error",
-        "message": "Une erreur inattendue est survenue. Veuillez réessayer.",
+        "message": "An unexpected error occurred. Please try again.",
     })
 ''')
 
@@ -1129,14 +1129,14 @@ def authenticate(username: str, password: str) -> Optional[str]:
     return role if _verify_password(password, pw_hash) else None
 
 def issue_token(username: str, role: str, subject: Optional[str] = None) -> str:
-    """Émet un JWT signé HS256.
+    """Issue an HS256-signed JWT.
 
-    `subject` permet de surcharger `sub` quand le pattern d'auth env-var
-    a besoin d'un UUID synthétique (vs login signup où `username` = UUID
-    réel de l'entité). Cf. `issue_token_for_env_user` ci-dessous —
-    sans ça, `sub = "user"` (string) causait des `psycopg2.errors.\
-InvalidTextRepresentation` au runtime quand le service utilise
-    `\\$auth: user_id` pour assigner à une colonne UUID.
+    `subject` overrides `sub` for the env-var auth pattern, which needs a
+    synthetic UUID (unlike signup/login, where `username` is the entity's
+    real UUID). See `issue_token_for_env_user` below: without it,
+    `sub = "user"` (a string) raised `psycopg2.errors.\
+InvalidTextRepresentation` at runtime whenever the service used
+    `\\$auth: user_id` to assign a UUID column.
     """
     now = datetime.now(timezone.utc)
     payload = {{
@@ -1150,17 +1150,16 @@ InvalidTextRepresentation` au runtime quand le service utilise
     return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
 def issue_token_for_env_user(username: str, role: str) -> str:
-    """Émet un JWT pour un utilisateur env-var (AUTH_USER_<ROLE>_PASSWORD).
+    """Issue a JWT for an env-var user (AUTH_USER_<ROLE>_PASSWORD).
 
-    Synthétise un UUID déterministe via MD5(envvar-user:<username>) pour
-    pouvoir l'utiliser comme `sub` (UUID-typed côté DB). Sans ça, le `sub`
-    était la string `username` brute (e.g. "user"), qui crashait à
-    l'insertion dans une colonne UUID (`\\$auth: user_id` -> Postgres
-    `InvalidTextRepresentation`).
+    Derives a deterministic UUID from MD5(envvar-user:<username>) so it can
+    be used as `sub` (UUID-typed in the database). Without it, `sub` was the
+    raw `username` string (e.g. "user"), which failed on insert into a UUID
+    column (`\\$auth: user_id` -> Postgres `InvalidTextRepresentation`).
 
-    Parité Fastify `issueTokenForEnvUser` — même algo MD5, même UUID
-    déterministe par username -> même utilisateur côté DB peu importe la
-    cible compilée.
+    Mirrors Fastify's `issueTokenForEnvUser`: same MD5, same deterministic
+    UUID per username, so the same user is seen in the database whichever
+    target the document was compiled to.
     """
     import hashlib
     h = hashlib.md5(f"envvar-user:{{username}}".encode()).hexdigest()
@@ -1171,7 +1170,7 @@ def _decode(token: str) -> dict:
     try:
         return pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO], issuer=JWT_ISSUER)
     except pyjwt.ExpiredSignatureError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expiré")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
     except pyjwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalide")
 
@@ -1180,18 +1179,18 @@ _bearer = HTTPBearer(auto_error=False)
 
 def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)) -> dict:
     if creds is None or not creds.credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise",
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required",
                             headers={{"WWW-Authenticate": "Bearer"}})
     return _decode(creds.credentials)
 
 def optional_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)) -> Optional[dict]:
-    """Public-route dependency — décode le Bearer si présent, retourne None sinon.
+    """Public-route dependency: decode the Bearer token if present, else None.
 
-    F-RUNTIME-1 fix — marque `current_user` comme dépendance FastAPI (vs body
-    parameter), empêchant FastAPI d'auto-activer `embed=True` sur le body
-    schema. Avant : `current_user: Optional[dict] = None` était compté comme
-    2e body param avec data, FastAPI activait embed → client devait envoyer
-    `{{"data": {{...}}}}` au lieu de `{{...}}` direct.
+    Declaring `current_user` as a FastAPI dependency (rather than a plain
+    parameter) stops FastAPI from turning on `embed=True` for the body
+    schema. As a bare `current_user: Optional[dict] = None` it counted as a
+    second body parameter alongside `data`, FastAPI embedded them, and
+    clients had to send `{{"data": {{...}}}}` instead of `{{...}}`.
     """
     if creds is None or not creds.credentials:
         return None
@@ -1206,7 +1205,7 @@ def require_role(*allowed_roles: str):
         groups = user.get("groups", [])
         if not any(r in allowed_roles for r in groups):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                                detail=f"Rôle requis : {{', '.join(allowed_roles)}}")
+                                detail=f"Required role: {{', '.join(allowed_roles)}}")
         return user
     return _checker
 
@@ -1240,11 +1239,11 @@ class LoginResponse(BaseModel):
 async def login(req: LoginRequest) -> LoginResponse:
     role = authenticate(req.username, req.password)
     if role is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Identifiants invalides")
-    # F-RUNTIME-BRIEF1-UUID-SUB — utilise issue_token_for_env_user (sub UUID
-    # synthétique déterministe) au lieu d'issue_token (sub = username string).
-    # Sans ça, `\\$auth: user_id` côté service crashe à l'insertion dans une
-    # colonne UUID Postgres (InvalidTextRepresentation: "user").
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    # Uses issue_token_for_env_user (deterministic synthetic UUID as `sub`)
+    # rather than issue_token (`sub` = the raw username string). Otherwise
+    # `\\$auth: user_id` fails on insert into a Postgres UUID column
+    # (InvalidTextRepresentation: "user").
     return LoginResponse(token=issue_token_for_env_user(req.username, role), role=role, expires_in=TOKEN_TTL)
 ''')
 
@@ -3754,7 +3753,7 @@ def get_service(db: Session = Depends(get_db)) -> {service_class}:
         desc_parts = []
         if auth and auth.get("required"):
             roles = auth.get("roles", [])
-            desc_parts.append(f"**Authentification** : {', '.join(roles)}" if roles else "**Authentification requise**")
+            desc_parts.append(f"**Authentication**: {', '.join(roles)}" if roles else "**Authentication required**")
         if rate_limit:
             desc_parts.append(f"**Rate limit** : {rate_limit.get('limit', 100)} requêtes / {rate_limit.get('window', 'PT1M')}")
         description = " | ".join(desc_parts) if desc_parts else ""
@@ -3767,15 +3766,15 @@ def get_service(db: Session = Depends(get_db)) -> {service_class}:
             entity_label = tag
 
         if method == "get" and not path_params:
-            summary = f"Lister les {entity_label}s"
+            summary = f"List {entity_label}s"
         elif method == "get" and path_params:
-            summary = f"Obtenir un {entity_label} par ID"
+            summary = f"Get a {entity_label} by ID"
         elif method == "post":
-            summary = f"Créer un {entity_label}"
+            summary = f"Create a {entity_label}"
         elif method in ("put", "patch"):
-            summary = f"Modifier un {entity_label}"
+            summary = f"Update a {entity_label}"
         elif method == "delete":
-            summary = f"Supprimer un {entity_label}"
+            summary = f"Delete a {entity_label}"
         else:
             summary = f"{method.upper()} {route}"
 
@@ -3795,13 +3794,13 @@ def get_service(db: Session = Depends(get_db)) -> {service_class}:
         # Documented error responses for Swagger
         responses_parts = []
         if auth and auth.get("required"):
-            responses_parts.append('401: {"description": "Non authentifié"}')
-            responses_parts.append('403: {"description": "Accès interdit"}')
+            responses_parts.append('401: {"description": "Not authenticated"}')
+            responses_parts.append('403: {"description": "Access denied"}')
         if path_params:
-            responses_parts.append('404: {"description": "Ressource non trouvée"}')
+            responses_parts.append('404: {"description": "Resource not found"}')
         if method in ("post", "put", "patch"):
-            responses_parts.append('422: {"description": "Données invalides"}')
-            responses_parts.append('409: {"description": "Conflit (doublon)"}')
+            responses_parts.append('422: {"description": "Invalid data"}')
+            responses_parts.append('409: {"description": "Conflict (duplicate)"}')
         resp_str = f", responses={{{', '.join(responses_parts)}}}" if responses_parts else ""
 
         # Convert ACIR window (e.g. "PT1M", "PT30S") to slowapi format (e.g. "100/minute", "30/second")
@@ -4105,12 +4104,12 @@ app = FastAPI(
 
 ---
 
-### Généré par ACIR (Agent Code Intermediate Representation)
+### Generated by ACIR (Agent Code Intermediate Representation)
 
-- **{type_count} types** définis · **{unit_count} unités** · **{ep_count} endpoints**
-- Validation par Pydantic, auth JWT (si activée), rate limiting réel via SlowAPI
+- **{type_count} types** · **{unit_count} units** · **{ep_count} endpoints**
+- Pydantic validation, JWT auth (when enabled), rate limiting via SlowAPI
 
-📖 [Documentation ACIR](https://ldlabs.dev) — © Ld Labs
+📖 [ACIR](https://github.com/dradlz/acir-project)
 """,
     version="1.0.0",
     docs_url="/docs",
@@ -4202,7 +4201,7 @@ async def health():
                 expected = f"({success_code}, 200, 201, 404)" if path_params else f"({success_code}, 200, 201)"
                 test_cases.append(f'''
 async def test_{fn_name}_success(client{auth_arg}):
-    """{method.upper()} {route} — succès ({success_code})."""
+    """{method.upper()} {route} — success ({success_code})."""
     response = await client.{method}("{test_route}", json={valid_body}{auth_kw})
     assert response.status_code in {expected}
 ''')
@@ -4212,7 +4211,7 @@ async def test_{fn_name}_success(client{auth_arg}):
                     test_route = test_route.replace("{" + pp + "}", "00000000-0000-0000-0000-000000000001")
                 test_cases.append(f'''
 async def test_{fn_name}_success(client{auth_arg}):
-    """{method.upper()} {route} — succès."""
+    """{method.upper()} {route} — success."""
     response = await client.{method}("{test_route}"{auth_kw})
     assert response.status_code in [{success_code}, 200, 404]
 ''')
@@ -4431,27 +4430,27 @@ testpaths = tests
 
         self._add_file("README.md", f"""# {name} — Python/FastAPI
 
-> Généré par **ACIR** (Agent Code Intermediate Representation) — © Ld Labs
-> Compilateur : `acir_compiler_fastapi` v{COMPILER_VERSION} · ACIR cible : {COMPILER_ACIR_VERSION}
+> Generated by **ACIR** (Agent Code Intermediate Representation)
+> Compiler: `acir_compiler_fastapi` v{COMPILER_VERSION} · target ACIR: {COMPILER_ACIR_VERSION}
 
 {doc}
 
-## Structure du projet
+## Project layout
 
 ```
 app/
 ├── __init__.py
-├── main.py         # Application FastAPI (Swagger intégré)
-├── database.py     # Configuration SQLAlchemy
-├── models.py       # Modèles SQLAlchemy ({len(entities)} entités)
-├── schemas.py      # Schémas Pydantic (validation des contrats)
-├── service.py      # Logique métier ({len(units)} unités)
-├── routes.py       # Routes FastAPI ({len(exposed)} endpoints)
-├── errors.py       # Gestion d'erreurs (catch-all, jamais de leak)
-└── security.py     # Headers OWASP, XSS, log masking
+├── main.py         # FastAPI application (Swagger built in)
+├── database.py     # SQLAlchemy configuration
+├── models.py       # SQLAlchemy models ({len(entities)} entities)
+├── schemas.py      # Pydantic schemas (contract validation)
+├── service.py      # Business logic ({len(units)} units)
+├── routes.py       # FastAPI routes ({len(exposed)} endpoints)
+├── errors.py       # Error handling (catch-all, never leaks)
+└── security.py     # OWASP headers, XSS, log masking
 tests/
-├── conftest.py     # Fixtures pytest (client async)
-└── test_api.py     # Tests d'intégration + tests Swagger
+├── conftest.py     # pytest fixtures (async client)
+└── test_api.py     # Integration tests + Swagger tests
 requirements.txt
 pytest.ini
 .env
@@ -4459,46 +4458,46 @@ pytest.ini
 
 ## Endpoints
 
-| Méthode | Route | Code | Auth |
-|---------|-------|------|------|
+| Method | Route | Code | Auth |
+|--------|-------|------|------|
 {ep_table}
 
-🔒 = Authentification requise | 🌐 = Public
+🔒 = authentication required | 🌐 = public
 
-## Documentation API intégrée
+## Built-in API documentation
 
-L'API expose automatiquement sa documentation :
+The API serves its own documentation:
 
 | URL | Description |
 |-----|-------------|
-| `/docs` | **Swagger UI** — interface interactive (Try It Out) |
-| `/redoc` | **ReDoc** — documentation lisible |
-| `/openapi.json` | **Spécification OpenAPI 3.1** (importable dans Postman) |
+| `/docs` | **Swagger UI** — interactive (Try It Out) |
+| `/redoc` | **ReDoc** — readable reference |
+| `/openapi.json` | **OpenAPI 3.1 specification** (importable into Postman) |
 | `/health` | Health check |
 
-## Prérequis
+## Requirements
 
 - Python 3.11+
-- PostgreSQL 15+ (ou Docker)
+- PostgreSQL 15+ (or Docker)
 
-## Démarrage rapide
+## Quick start
 
 ```bash
-# 1. Installer les dépendances
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Démarrer PostgreSQL
+# 2. Start PostgreSQL
 docker run -d --name postgres -e POSTGRES_USER=acir -e POSTGRES_PASSWORD=acir \\
   -e POSTGRES_DB={snake} -p 5432:5432 postgres:16-alpine
 
-# 3. Configurer l'environnement
+# 3. Configure the environment
 cp .env .env.local
-# Éditer .env.local si nécessaire
+# Edit .env.local if needed
 
-# 4. Lancer l'application
+# 4. Run the application
 uvicorn app.main:app --reload --port 8080
 
-# 5. Ouvrir Swagger UI
+# 5. Open Swagger UI
 open http://localhost:8080/docs
 ```
 
@@ -4508,34 +4507,35 @@ open http://localhost:8080/docs
 pytest -v
 ```
 
-Les tests couvrent : happy path, validation des contrats, 404, et les 3 endpoints Swagger (docs, redoc, openapi.json).
+The tests cover the happy path, contract validation, 404s, and the three
+Swagger endpoints (docs, redoc, openapi.json).
 
-## Build production
+## Production build
 
 ```bash
-# Directement
+# Directly
 uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 4
 
-# Avec Docker
+# With Docker
 docker build -t {snake} .
 docker run -p 8080:8080 -e DATABASE_URL=... {snake}
 ```
 
-## Sécurité intégrée
+## Built-in security
 
-- **Headers OWASP** : HSTS, X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy, Permissions-Policy
-- **CORS restrictif** : origines configurables via `CORS_ORIGINS`
-- **Middleware XSS** : détection et blocage des payloads XSS dans les query params
-- **Rate limiting** : via slowapi (configurable par endpoint)
-- **Body limit** : via middleware (anti-DoS)
-- **Catch-all erreurs** : jamais de leak de stack traces en production
-- **Log masking** : champs sensibles automatiquement masqués dans les logs
-- **Request ID** : header X-Request-Id pour la traçabilité
-- **Cache-Control** : no-store par défaut sur les réponses API
+- **OWASP headers**: HSTS, X-Content-Type-Options, X-Frame-Options, CSP, Referrer-Policy, Permissions-Policy
+- **Restrictive CORS**: origins configurable through `CORS_ORIGINS`
+- **XSS middleware**: detects and blocks XSS payloads in query parameters
+- **Rate limiting**: through slowapi, configurable per endpoint
+- **Body limit**: middleware (anti-DoS)
+- **Catch-all errors**: stack traces never reach the client
+- **Log masking**: sensitive fields are masked in logs automatically
+- **Request ID**: `X-Request-Id` header for traceability
+- **Cache-Control**: `no-store` by default on API responses
 
-## Contrats ACIR compilés
+## Compiled ACIR contracts
 
-| Contrat ACIR | Validation Pydantic |
+| ACIR contract | Pydantic validation |
 |---|---|
 | C_RANGE | `Field(ge=..., le=...)` |
 | C_LENGTH | `Field(min_length=..., max_length=...)` |
@@ -4544,13 +4544,13 @@ docker run -p 8080:8080 -e DATABASE_URL=... {snake}
 | C_UNIQUE | `Column(unique=True)` (SQLAlchemy) |
 | C_SANITIZE | `@field_validator` (trim, html_escape, strip_tags) |
 
-## Généré par ACIR
+## Generated by ACIR
 
-Ce projet a été généré par le compilateur ACIR Python/FastAPI.
-Le même document ACIR peut être compilé vers Java/Quarkus ou TypeScript/Fastify
-pour obtenir un projet fonctionnellement équivalent.
+This project was produced by the ACIR Python/FastAPI compiler. The same ACIR
+document compiles to Java/Quarkus or TypeScript/Fastify and yields a
+functionally equivalent project.
 
-📖 [Documentation ACIR](https://ldlabs.dev) — © Ld Labs
+📖 [ACIR](https://github.com/dradlz/acir-project)
 """)
 
     # ─── alembic/ — DB migrations (replaces Base.metadata.create_all) ─────
