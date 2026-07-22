@@ -56,6 +56,29 @@ python compilers/determinism_check.py --update   # then commit GOLDEN.sha256
 A pin that changes without an explanation in the commit message is the thing
 this file exists to catch.
 
+## Does the generated code work?
+
+Determinism says the bytes are stable. It says nothing about whether they run.
+
+```bash
+python compilers/e2e_check.py
+```
+
+This compiles a reference document, installs the generated project's
+dependencies into a throwaway virtualenv, and runs the test suite the compiler
+itself emits — `tests/` is written on every compilation and, until this
+existed, had never been executed. The tests use SQLite, so no database server
+is needed. It takes about a minute and needs network access.
+
+**The suite does not currently pass.** Two failures are real compiler defects,
+pinned in `E2E_EXPECTED.json` with the issue tracking each. The check verifies
+that the result matches the pin exactly: a new failure is a regression, and a
+known failure that starts passing also fails the check, so a fix cannot land
+without updating the pin and closing the issue.
+
+Pinning a known-red result is deliberate. Leaving the suite unexecuted until it
+was perfect is how it came to ship broken in the first place.
+
 ## Writing a compiler
 
 Nothing about the format privileges these implementations. If you are
