@@ -5,7 +5,7 @@
 
 > ⚠️ **HISTORICAL DOCUMENT (v0.2.0) — NON-NORMATIVE.** The spec has since evolved to v0.3.x.
 > The **normative source of truth** is now the JSON-schema
-> [../docs/schemas/acir-v0.3.1.json](../docs/schemas/acir-v0.3.1.json) (shapes, closed enums,
+> [../docs/schemas/acir-v0.3.2.json](../docs/schemas/acir-v0.3.2.json) (shapes, closed enums,
 > `additionalProperties: false`), complemented by the semantic rules of
 > [../validator/acir_validator.py](../validator/acir_validator.py) (`$calculate` DSL,
 > OWASP-aligned security, cross-field checks).

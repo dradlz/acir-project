@@ -1,6 +1,6 @@
 # ACIR Validator
 
-Six-level validation pipeline for ACIR documents. This is the reference implementation of the specification's semantic rules — the second normative source after the [JSON Schema](../docs/schemas/acir-v0.3.1.json).
+Six-level validation pipeline for ACIR documents. This is the reference implementation of the specification's semantic rules — the second normative source after the [JSON Schema](../docs/schemas/acir-v0.3.2.json).
 
 ## Usage
 

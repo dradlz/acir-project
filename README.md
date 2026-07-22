@@ -41,7 +41,7 @@ ACIR proposes to complete the chain, borrowing a pattern that industries like ED
 | Component | Description | Status |
 |---|---|---|
 | **Specification** | [`spec/`](spec/README.md) — the format: 5 primitive families (Data, Flow, I/O, Contract, Composition), value expressions, module & project document kinds | **v0.3.x** |
-| **JSON Schema** | [`docs/schemas/acir-v0.3.1.json`](docs/schemas/acir-v0.3.1.json) — normative shapes, Draft 2020-12, closed enums, `additionalProperties: false` | Normative |
+| **JSON Schema** | [`docs/schemas/acir-v0.3.2.json`](docs/schemas/acir-v0.3.2.json) — normative shapes, Draft 2020-12, closed enums, `additionalProperties: false` | Normative |
 | **Validator** | [`validator/`](validator/README.md) — the 6-level reference validator, including the 15 security rules. Single-file Python; optional `jsonschema` dependency for the schema pass | Working |
 | **Generation tool** | [`tools/generate.py`](tools/README.md) — brief → LLM (Anthropic / OpenAI / Mistral, your key) → validated document, with automatic error-feedback retries; offline mock mode for CI | Working |
 | **Examples** | [`examples/`](examples/README.md) — a stress-test e-commerce module, and a 3-microservice project manifest mixing Java/Quarkus, TypeScript/Fastify, and Python/FastAPI in one system | Validating 6/6 · 2/2 |

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ACIR Document v0.3.1",
+  "title": "ACIR Document v0.3.2",
   "description": "Formal JSON-schema for ACIR v0.3 documents (supports both 0.3.0 and 0.3.1). v0.3.1 adds the string form for $calculate (named reference to module.transforms[]). Everything else — data primitives, F_FOREACH, F_GUARD, $auth, $context, $verify, $validate, $conditional — is unchanged between 0.3.0 and 0.3.1. Semantic checks (e.g. $auth in public route, $calculate DSL parse, $input wildcard scope, output-type-matches-body) are enforced by the validator beyond what JSON-schema can express.",
   "type": "object",
   "required": [

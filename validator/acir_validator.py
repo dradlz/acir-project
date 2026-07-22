@@ -160,7 +160,7 @@ CONTEXT_NAMESPACES = {"request", "tenant"}
 # ─── JSON-schema loader (v0.3) ────────────────────────────────────────────────
 
 _V03_SCHEMA_CACHE: dict | None = None
-_SCHEMA_REL = ("docs", "schemas", "acir-v0.3.1.json")
+_SCHEMA_REL = ("docs", "schemas", "acir-v0.3.2.json")
 # The validator is invoked from various layouts: local repo
 # (`compilers/acir_validator.py` → parent.parent = repo root), conteneur
 # Docker (`/app/backend/compilers/...` → parent.parent = `/app/backend`),
@@ -187,7 +187,7 @@ _V03_SCHEMA_PATH = _resolve_v03_schema_path()
 
 # ACIR versions handled in first-class v0.3 mode (schema Draft 2020-12 +
 # L2/L3 semantic extensions). 0.3.0 and 0.3.1 share the same schema
-# (acir-v0.3.1.json, acir_version enum) and the same semantic rules —
+# (acir-v0.3.2.json, acir_version enum) and the same semantic rules —
 # 0.3.1 only adds the string form of $calculate, handled at compiler level.
 _V03_VERSIONS = ("0.3.0", "0.3.1", "0.3.2")
 
@@ -289,7 +289,7 @@ class ACIRValidator:
 
         # Niveau 1 — Validation structurelle (dispatch v0.2 / v0.3). Le mode v0.3
         # activates for EVERY 0.3.x version (0.3.0 AND 0.3.1) — the schema
-        # acir-v0.3.1.json covers both (acir_version enum), and the v0.3
+        # acir-v0.3.2.json covers both (acir_version enum), and the v0.3
         # semantic rules (F_FOREACH/$calculate/$auth/...) are identical.
         if _is_v03(self._doc_version):
             self._level1_jsonschema_v03(doc)
@@ -354,7 +354,7 @@ class ACIRValidator:
             self.schema_validated = False
             self._issue(1, Severity.WARNING, "$", "SCHEMA_FILE_MISSING",
                        f"v0.3.0 JSON schema not found at {_V03_SCHEMA_PATH} — structural pass degraded",
-                       suggestion="Check that docs/schemas/acir-v0.3.1.json exists")
+                       suggestion="Check that docs/schemas/acir-v0.3.2.json exists")
             return
         self.schema_validated = True
         validator = Draft202012Validator(schema)

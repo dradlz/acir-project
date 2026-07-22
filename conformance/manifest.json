@@ -1,5 +1,5 @@
 {
-  "conformance_version": "0.3.1",
+  "conformance_version": "0.3.2",
   "description": "Conformance corpus for ACIR 0.3.x. See README.md for the rules.",
   "cases": [
     {

@@ -1,5 +1,5 @@
 {
-  "acir_version": "0.3.0",
+  "acir_version": "0.3.2",
   "module": {
     "name": "ECommerce",
     "doc": "v0.3 stress-test brief — exercises $auth/$calculate/$generate template/F_FOREACH parallel/transforms/validators/relations",
