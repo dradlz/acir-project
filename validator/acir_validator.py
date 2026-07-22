@@ -596,7 +596,7 @@ class ACIRValidator:
                             f"$.project.components[{cname}]",
                             "CROSS_CALL_UNDECLARED_DEP",
                             f"IO_CALL from '{cname}' to '{tgt}' not declared in its dependencies "
-                            f"→ l'infra n'injectera pas {str(tgt).upper()}_URL",
+                            f"-> the infrastructure will not inject {str(tgt).upper()}_URL",
                             suggestion=f"Add {{\"$component\": \"{tgt}\"}} to the dependencies of '{cname}'")
                     continue
                 if tgt in inline_mod:
@@ -739,7 +739,7 @@ class ACIRValidator:
         kind = scalar.get("kind")
         if kind not in SCALAR_KINDS:
             self._issue(1, Severity.ERROR, f"{path}.kind", "INVALID_SCALAR_KIND",
-                       f"Kind scalaire invalide: '{kind}'. Valides: {', '.join(sorted(SCALAR_KINDS))}")
+                       f"Invalid scalar kind: '{kind}'. Valid: {', '.join(sorted(SCALAR_KINDS))}")
 
     def _validate_enum(self, enum_def: dict, path: str):
         values = enum_def.get("values")
@@ -835,7 +835,7 @@ class ACIRValidator:
         kind = coll.get("kind", "list")  # default: list (often omitted by LLMs)
         if kind not in {"list", "set", "map", "queue", "stack"}:
             self._issue(1, Severity.ERROR, f"{path}.kind", "INVALID_COLLECTION_KIND",
-                       f"Kind de collection invalide: '{kind}'")
+                       f"Invalid collection kind: '{kind}'")
 
         # Reject non-canonical synonym keys with a precise message
         for syn in self._COLLECTION_SYNONYMS:
@@ -946,7 +946,7 @@ class ACIRValidator:
                     kind = on_fail.get("kind")
                     if kind and kind not in ERROR_KINDS:
                         self._issue(1, Severity.ERROR, f"{path}.on_fail.kind", "INVALID_ERROR_KIND",
-                                   f"ErrorKind invalide: '{kind}'")
+                                   f"Invalid ErrorKind: '{kind}'")
 
         elif primitive == "F_BRANCH":
             if _is_v03(self._doc_version):
@@ -1006,7 +1006,7 @@ class ACIRValidator:
             source_kind = op.get("source_kind")
             if source_kind is not None and source_kind not in SOURCE_KINDS:
                 self._issue(1, Severity.ERROR, f"{path}.source_kind", "INVALID_SOURCE_KIND",
-                           f"source_kind invalide: '{source_kind}'")
+                           f"Invalid source_kind: '{source_kind}'")
             if "entity" not in op:
                 self._issue(1, Severity.ERROR, f"{path}.entity", "QUERY_NO_ENTITY",
                            "IO_QUERY must have an 'entity'")
@@ -1024,11 +1024,11 @@ class ACIRValidator:
             source_kind = op.get("source_kind")
             if source_kind is not None and source_kind not in SOURCE_KINDS:
                 self._issue(1, Severity.ERROR, f"{path}.source_kind", "INVALID_SOURCE_KIND",
-                           f"source_kind invalide: '{source_kind}'")
+                           f"Invalid source_kind: '{source_kind}'")
             action = op.get("action")
             if action not in MUTATE_ACTIONS:
                 self._issue(1, Severity.ERROR, f"{path}.action", "INVALID_MUTATE_ACTION",
-                           f"action invalide: '{action}'. Valides: {', '.join(MUTATE_ACTIONS)}")
+                           f"Invalid action: '{action}'. Valid: {', '.join(MUTATE_ACTIONS)}")
             if action != "delete" and "data" not in op:
                 self._issue(1, Severity.WARNING, f"{path}.data", "MUTATE_NO_DATA",
                            f"IO_MUTATE with action '{action}' should have a 'data'")
@@ -1097,7 +1097,7 @@ class ACIRValidator:
         kind = expose.get("kind")
         if kind not in EXPOSE_KINDS:
             self._issue(1, Severity.ERROR, f"{path}.kind", "INVALID_EXPOSE_KIND",
-                       f"Kind d'exposition invalide: '{kind}'")
+                       f"Invalid expose kind: '{kind}'")
 
         if kind == "http_endpoint":
             if "route" not in expose:
@@ -1658,7 +1658,7 @@ class ACIRValidator:
                     self._issue(5, Severity.INFO,
                                f"$.module.exposed[{i}]",
                                "ALL_ROLES_ALLOWED",
-                               f"L'endpoint {ep.get('method')} {ep.get('route')} "
+                               f"Endpoint {ep.get('method')} {ep.get('route')} "
                                f"allows all roles ({', '.join(sorted(roles))}) — "
                                f"check whether this is intentional",
                                "Restrict to the necessary roles if possible")
@@ -1744,7 +1744,7 @@ class ACIRValidator:
                                        f"$.module.types[{type_name}].fields[{j}]",
                                        "INPUT_STRING_NO_SANITIZE",
                                        f"String field '{fname}' in DTO "
-                                       f"'{type_name}' n'a ni C_SANITIZE ni C_PATTERN — "
+                                       f"'{type_name}' has neither C_SANITIZE nor C_PATTERN — "
                                        f"inputs will not be sanitized",
                                        "Add { primitive: 'C_SANITIZE', modes: "
                                        "['trim', 'html_escape'] }")
@@ -1805,7 +1805,7 @@ class ACIRValidator:
                 if isinstance(url, str) and url.startswith("http://"):
                     self._issue(5, Severity.WARNING, f"{path}.url",
                                "INSECURE_HTTP_URL",
-                               f"L'URL '{url}' utilise HTTP au lieu de HTTPS",
+                               f"URL '{url}' uses HTTP instead of HTTPS",
                                "Use HTTPS to protect data in transit")
                 elif isinstance(url, dict):
                     interp = url.get("$interpolate", "")
@@ -2388,7 +2388,7 @@ class ACIRValidator:
                         if kind not in GENERATE_PARAMETERIZED_KINDS:
                             self._issue(
                                 2, Severity.ERROR, path, "GENERATE_UNKNOWN_KIND",
-                                f"`$generate.kind: \"{kind}\"` non reconnu (valides: {sorted(GENERATE_PARAMETERIZED_KINDS)})",
+                                f"`$generate.kind: \"{kind}\"` is not recognized (valid: {sorted(GENERATE_PARAMETERIZED_KINDS)})",
                             )
                 for k, v in node.items():
                     walk(v, f"{path}.{k}")
@@ -2655,8 +2655,8 @@ class ACIRValidator:
                         self._issue(
                             2, Severity.ERROR, f"$.module.units[{unit.get('name','?')}].$calculate",
                             "CALC_REF_UNRESOLVED",
-                            f"$calculate: '{root}.{fld}' — '{root}' est un scalaire, "
-                            f"field access impossible.",
+                            f"$calculate: '{root}.{fld}' — '{root}' is a scalar, "
+                            f"field access is not possible.",
                             suggestion="Use a record/collection-typed alias, or remove the field access.")
                     # ('enum'|'unknown') → skip (doctrine doute⇒skip)
 
@@ -2873,7 +2873,7 @@ class ACIRValidator:
                                 self._issue(
                                     3, Severity.ERROR, f"{path}.$calculate.formula",
                                     "CALCULATE_DSL_PARSE_ERROR",
-                                    f"Formule `{formula}` invalide : {err}",
+                                    f"Invalid formula `{formula}`: {err}",
                                     suggestion="Cf. v0.3 BNF grammar — arithmetic + sum/count/avg/min/max + dot-access + wildcard inside aggregator only",
                                 )
                 for k, v in node.items():
