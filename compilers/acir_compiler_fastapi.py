@@ -2118,7 +2118,7 @@ class {service_class}:
                 continue
             if c in "+-/%":
                 tokens.append(("OP", c, i)); i += 1; continue
-            raise ValueError(f"caractère inattendu `{c}` à la position {i}")
+            raise ValueError(f"unexpected character `{c}` at position {i}")
         return tokens
 
     def _calc_peek_py(self, state):
@@ -2163,7 +2163,7 @@ class {service_class}:
             inner = self._calc_parse_expr_py(state, in_agg)
             close = self._calc_peek_py(state)
             if close is None or close[0] != "RPAREN":
-                raise ValueError(f"`)` attendu à la position {pos}")
+                raise ValueError(f"expected `)` at position {pos}")
             self._calc_consume_py(state)
             return inner
         if ttype == "NUMBER":
@@ -2177,7 +2177,7 @@ class {service_class}:
                 inner = self._calc_parse_expr_py(state, in_agg=True)
                 close = self._calc_peek_py(state)
                 if close is None or close[0] != "RPAREN":
-                    raise ValueError(f"`)` attendu pour fermer {tval}(...)")
+                    raise ValueError(f"expected `)` to close {tval}(...)")
                 self._calc_consume_py(state)
                 return {"kind": "agg", "name": tval, "inner": inner}
             self._calc_consume_py(state)
@@ -2189,7 +2189,7 @@ class {service_class}:
                 self._calc_consume_py(state)
                 seg = self._calc_peek_py(state)
                 if seg is None:
-                    raise ValueError(f"segment de path attendu après `.` à la position {pos}")
+                    raise ValueError(f"expected a path segment after `.` at position {pos}")
                 if seg[0] == "WILDCARD_STAR":
                     self._calc_consume_py(state)
                     segments.append("*")
@@ -2199,7 +2199,7 @@ class {service_class}:
                 else:
                     break
             return {"kind": "path", "segments": segments}
-        raise ValueError(f"token inattendu `{tval}` à la position {pos}")
+        raise ValueError(f"unexpected token `{tval}` at position {pos}")
 
     def _calc_collect_collection_root_py(self, node):
         if not isinstance(node, dict):
@@ -4794,7 +4794,7 @@ def compile_file(input_path: str, output_dir: str) -> int:
 
     module = doc.get("module")
     if not module:
-        print("❌ Document ACIR invalide (clé 'module' manquante)")
+        print("❌ Invalid ACIR document (missing 'module' key)")
         return 1
 
     # Banner version — traçabilité dans les logs CI / CLI / API.
@@ -4806,7 +4806,7 @@ def compile_file(input_path: str, output_dir: str) -> int:
             parts.append("0")
         return ".".join(parts[:3])
     if doc_version and _norm(doc_version) != _norm(COMPILER_ACIR_VERSION):
-        print(f"⚠️  ACIR {doc_version} ≠ compilateur ACIR {COMPILER_ACIR_VERSION} — compatibilité best-effort")
+        print(f"⚠️  document ACIR {doc_version} ≠ compiler ACIR {COMPILER_ACIR_VERSION} — best-effort compatibility")
 
     print(f"🐍 ACIR → Python/FastAPI")
     print(f"   Module: {module.get('name', '?')}")
@@ -4821,7 +4821,7 @@ def compile_file(input_path: str, output_dir: str) -> int:
     for path, content in files:
         full_path = os.path.join(output_dir, path)
         if os.path.commonpath([out_root, os.path.realpath(full_path)]) != out_root:
-            raise ValueError(f"Chemin de sortie hors du répertoire cible refusé : {path!r}")
+            raise ValueError(f"Refused: output path escapes the target directory: {path!r}")
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         # Encoding and line ending are pinned, not inherited. Without them the
         # same document produces different bytes on different machines: the
@@ -4832,7 +4832,7 @@ def compile_file(input_path: str, output_dir: str) -> int:
             f.write(content)
         print(f"   ✅ {path}")
 
-    print(f"\n🎉 {len(files)} fichiers générés")
+    print(f"\n🎉 {len(files)} files generated")
     print(f"   📖 Swagger UI : http://localhost:8080/docs")
     print(f"   📖 ReDoc      : http://localhost:8080/redoc")
     print(f"   📖 OpenAPI    : http://localhost:8080/openapi.json")
