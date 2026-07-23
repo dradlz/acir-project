@@ -101,7 +101,7 @@ class ValidationResult:
         }
 
 
-# ─── Constantes ────────────────────────────────────────────────────────────────
+# ─── Constants ────────────────────────────────────────────────────────────────
 
 VALID_PRIMITIVES = {
     "D_SCALAR", "D_ENUM", "D_RECORD", "D_COLLECTION", "D_UNION", "D_ALIAS",
@@ -113,11 +113,11 @@ VALID_PRIMITIVES = {
     "F_FOREACH",
     "IO_QUERY", "IO_MUTATE", "IO_HTTP", "IO_MESSAGE", "IO_CACHE",
     "IO_FILE", "IO_EXPOSE",
-    # v0.3.2 — appel HTTP synchrone inter-composant (microservices)
+    # v0.3.2 — synchronous HTTP call between components (microservices)
     "IO_CALL",
     # Axis 4 — typed escape hatch (validated boundary, opaque body;
     # cf. docs/FNATIVE-EVALUATION.md). Placement constrained by the schema
-    # (Operation only, jamais DataExpr).
+    # (Operation only, never DataExpr).
     "F_NATIVE",
     "C_RANGE", "C_PATTERN", "C_LENGTH", "C_PRECISION", "C_SIZE",
     "C_UNIQUE", "C_PRECONDITION", "C_POSTCONDITION", "C_INVARIANT",
@@ -162,8 +162,8 @@ CONTEXT_NAMESPACES = {"request", "tenant"}
 _V03_SCHEMA_CACHE: dict | None = None
 _SCHEMA_REL = ("docs", "schemas", "acir-v0.3.2.json")
 # The validator is invoked from various layouts: local repo
-# (`compilers/acir_validator.py` → parent.parent = repo root), conteneur
-# Docker (`/app/backend/compilers/...` → parent.parent = `/app/backend`),
+# (`compilers/acir_validator.py` → parent.parent = repo root),
+# Docker container (`/app/backend/compilers/...` → parent.parent = `/app/backend`),
 # and CI. We try a list of candidates instead of a single path so
 # the JSON-schema pass is always active (otherwise SCHEMA_FILE_MISSING
 # → silent degraded validation).
@@ -171,8 +171,8 @@ _here = Path(__file__).resolve()
 _V03_SCHEMA_CANDIDATES = [
     _here.parent.parent.joinpath(*_SCHEMA_REL),        # repo root layout
     _here.parent.parent.parent.joinpath(*_SCHEMA_REL),  # compilers nested 1 deeper
-    Path("/app/backend").joinpath(*_SCHEMA_REL),        # conteneur (image bundle)
-    Path("/app").joinpath(*_SCHEMA_REL),                # conteneur (alt)
+    Path("/app/backend").joinpath(*_SCHEMA_REL),        # container (image bundle)
+    Path("/app").joinpath(*_SCHEMA_REL),                # container (alt)
 ]
 
 
@@ -217,7 +217,7 @@ def _load_v03_schema() -> dict | None:
 
 
 # ─── WS0: closed enums derived from the schema (single source of truth) ─────────────
-# cf. docs/ACIR-CANONICAL-COMPLETENESS.md. Le validateur ne recopie plus les
+# cf. docs/ACIR-CANONICAL-COMPLETENESS.md. The validator no longer duplicates the
 # enums: it reads them from the JSON-schema. Fallback = reconciled canon (if the
 # schema is absent, the validator stays functional offline).
 # `.github/scripts/ci_checks.py` fails if schema and constants diverge.
@@ -258,7 +258,7 @@ GENERATE_BUILTIN_KINDS = _enum_from_schema(
     {"uuid", "now", "sequence", "ulid", "nanoid"})
 
 
-# ─── Validateur principal ──────────────────────────────────────────────────────
+# ─── Main validator ──────────────────────────────────────────────────────
 
 class ACIRValidator:
     def __init__(self):
@@ -287,7 +287,7 @@ class ACIRValidator:
         self._acir_kind = "module"
         self._doc_version = doc.get("acir_version") if isinstance(doc, dict) else None
 
-        # Niveau 1 — Validation structurelle (dispatch v0.2 / v0.3). Le mode v0.3
+        # Level 1 — Structural validation (dispatch v0.2 / v0.3). v0.3 mode
         # activates for EVERY 0.3.x version (0.3.0 AND 0.3.1) — the schema
         # acir-v0.3.2.json covers both (acir_version enum), and the v0.3
         # semantic rules (F_FOREACH/$calculate/$auth/...) are identical.
@@ -339,7 +339,7 @@ class ACIRValidator:
 
         return self._build_result(passed_level=6)
 
-    # ─── NIVEAU 1 v0.3 : JSON-schema Draft 2020-12 ─────────────────────────
+    # ─── LEVEL 1 v0.3: JSON-schema Draft 2020-12 ─────────────────────────
 
     def _level1_jsonschema_v03(self, doc: dict):
         """Wire the formal JSON-Schema into the v0.3 structural pass."""
@@ -412,8 +412,8 @@ class ACIRValidator:
 
         seen = set()
         # Iterate all errors (vs. fail-fast) to give complete feedback
-        # exhaustif au LLM — un seul appel /api/generate peut produire des
-        # corrections multiples si on rapporte plusieurs erreurs d'un coup.
+        # to the LLM — a single /api/generate call can 
+        # produce multiple fixes if we report several errors at once.
         for err in validator.iter_errors(doc):
             code = f"SCHEMA_{err.validator.upper()}" if err.validator else "SCHEMA_VIOLATION"
             if err.validator in ("oneOf", "anyOf"):
@@ -449,7 +449,7 @@ class ACIRValidator:
                code: str, message: str, suggestion: str = ""):
         self.issues.append(ValidationIssue(level, severity, path, code, message, suggestion))
 
-    # ─── NIVEAU PROJET (0.3.2) : manifeste multi-composants ────────────────
+    # ─── PROJECT LEVEL (0.3.2): multi-component manifest ────────────────
 
     def _level_project(self, doc: dict):
         """Validation of an `acir_kind:"project"` document."""
@@ -573,7 +573,7 @@ class ACIRValidator:
                     if tgt not in name_set:
                         # Nonexistent target: the generator invented a service
                         # third party (payment gateway, external API…) that no
-                        # composant du projet ne fournit. Pas d'auto-stub —
+                        # component of the project provides. No auto-stub —
                         # explicit, actionable failure (product decision).
                         self._issue(
                             2, Severity.ERROR,
@@ -611,7 +611,7 @@ class ACIRValidator:
                             f"matches no route exposed by the target",
                             suggestion="Check endpoint/method vs the target component's exposed[]")
 
-    # ─── NIVEAU 1 : Validation structurelle ────────────────────────────────
+    # ─── LEVEL 1: Structural validation ────────────────────────────────
 
     def _level1_structural(self, doc: dict):
         """Check that the document is structurally valid."""
@@ -649,7 +649,7 @@ class ACIRValidator:
                        "The module must be an object")
             return
 
-        # Nom requis
+        # Name required
         name = module.get("name")
         if not name:
             self._issue(1, Severity.ERROR, f"{path}.name", "MISSING_MODULE_NAME",
@@ -694,7 +694,7 @@ class ACIRValidator:
                 self._validate_orchestration(o, f"{path}.orchestrations[{i}]")
                 self.stats["orchestrations"] += 1
 
-        # Contracts au niveau module
+        # Contracts at module level
         contracts = module.get("contracts", [])
         if isinstance(contracts, list):
             for i, c in enumerate(contracts):
@@ -950,9 +950,9 @@ class ACIRValidator:
 
         elif primitive == "F_BRANCH":
             if _is_v03(self._doc_version):
-                # Forme canonique v0.3 ($defs/FBranch) : {condition, then,
-                # else?} — PAS de tableau `conditions`. Le schema JSON (niveau
-                # 1 v0.3) already checked the presence of condition/then; here we
+                # Canonical v0.3 form ($defs/FBranch) : {condition, then,
+                # else?} — NO conditions array. The JSON schema (level 1 v0.3)
+                # already checked the presence of condition/then; here we
                 # just recurses into then/else. (Without this gate, a
                 # valid v0.3 F_BRANCH triggered a false BRANCH_NO_CONDITIONS
                 # since the legacy structural pass expects the v0.2 shape.)
@@ -1010,7 +1010,7 @@ class ACIRValidator:
             if "entity" not in op:
                 self._issue(1, Severity.ERROR, f"{path}.entity", "QUERY_NO_ENTITY",
                            "IO_QUERY must have an 'entity'")
-            # Forme canonique : 'filter' (object map), pas 'filters' (array)
+            # Canonical form: 'filter' (object map), not 'filters' (array)
             if "filters" in op:
                 self._issue(1, Severity.ERROR, f"{path}.filters", "QUERY_FILTERS_NON_CANONICAL",
                            "Non-canonical key 'filters' (array); use 'filter' (object map)",
@@ -1020,7 +1020,7 @@ class ACIRValidator:
             self._check_canonical_pagination(op.get("pagination", {}), f"{path}.pagination")
 
         elif primitive == "IO_MUTATE":
-            # v0.3 : source_kind optionnel (default "relational"), cf. JSON-schema.
+            # v0.3: source_kind optional (default "relational"), cf. JSON-schema.
             source_kind = op.get("source_kind")
             if source_kind is not None and source_kind not in SOURCE_KINDS:
                 self._issue(1, Severity.ERROR, f"{path}.source_kind", "INVALID_SOURCE_KIND",
@@ -1108,7 +1108,7 @@ class ACIRValidator:
                 self._issue(1, Severity.ERROR, f"{path}.method", "HTTP_EXPOSE_NO_METHOD",
                            f"An HTTP endpoint must have a valid method, got: '{method}'")
 
-            # input_source: enum string canonique uniquement
+            # input_source: canonical string enum only
             if "input_source" in expose:
                 src = expose["input_source"]
                 if isinstance(src, dict):
@@ -1599,7 +1599,7 @@ class ACIRValidator:
                 ftype = field.get("type", {})
                 kind = ftype.get("kind", "") if isinstance(ftype, dict) else ""
 
-                # Email sans validation de format
+                # Email without format validation
                 if ("email" in fname) and kind == "string":
                     has_email_pattern = any(
                         c.get("primitive") == "C_PATTERN" and
@@ -1614,7 +1614,7 @@ class ACIRValidator:
                                    f"but has no email-format C_PATTERN contract",
                                    "Add { primitive: 'C_PATTERN', format: 'email' }")
 
-                # String sans contrainte de longueur (potentiel DoS)
+                # String without length constraint (potential DoS)
                 if kind == "string" and not field.get("sensitive"):
                     has_length = any(
                         c.get("primitive") == "C_LENGTH"
@@ -2059,7 +2059,7 @@ class ACIRValidator:
 
         # Entity index (D_RECORD with `identity[]`) — used by the
         # SCALAR_OUTPUT_ON_LIST_QUERY rule to distinguish entity (Task, User, ...)
-        # d'un DTO wrapper (PaginatedTasks, AuthResponse, ...). Ne PAS inclure
+        # from a DTO wrapper (PaginatedTasks, AuthResponse, ...). Do NOT include 
         # D_RECORDs without identity here, otherwise `output: $ref: PaginatedTasks`
         # on a paginated IO_QUERY would wrongly trigger SCALAR_OUTPUT_ON_LIST_QUERY
         # (observed on all paginated outputs generated by GPT-4o on briefs
@@ -2203,7 +2203,7 @@ class ACIRValidator:
                     suggestion="Ex: {\"$eq\": [{\"$input\": \"x\"}, 42]}",
                 )
 
-    # ─── v0.3 — Helpers de walking ─────────────────────────────────────────
+    # ─── v0.3 — Walking helpers ─────────────────────────────────────────
 
     def _body_contains_ref(self, body: Any, ref_key: str) -> bool:
         """Returns True if `ref_key` (e.g. `$auth`) appears anywhere in the body."""
@@ -2346,7 +2346,7 @@ class ACIRValidator:
             if isinstance(node, dict):
                 # $calculate.formula is itself a string; the walker will not descend
                 # into it for $input — the formula is validated by the DSL parser
-                # au niveau 3. Le scope "calculate" s'applique aux `inputs` du calculate
+                # at level 3. The "calculate" scope applies to the calculate's inputs, 
                 # not to the formula.
                 if "$input" in node and isinstance(node.get("$input"), str) and "*" in node["$input"]:
                     if not in_allowed_scope:
@@ -2598,8 +2598,8 @@ class ACIRValidator:
                     continue
                 # Do NOT pre-empt the level-3 DSL check: if the formula is
                 # grammatically invalid, skip (the pipeline short-circuits
-                # sur erreur niveau 2 → CALCULATE_DSL_PARSE_ERROR ne sortirait
-                # never). Refs are only resolved on a well-formed formula.
+                # on a level-2 error → CALCULATE_DSL_PARSE_ERROR would never 
+                # come out). Refs are only resolved on a well-formed formula.
                 try:
                     if self._parse_calculate_formula(formula) is not None:
                         continue
@@ -2660,7 +2660,7 @@ class ACIRValidator:
                             suggestion="Use a record/collection-typed alias, or remove the field access.")
                     # ('enum'|'unknown') → skip (doctrine doute⇒skip)
 
-    # R1 — familles de types scalaires. Une affectation cross-famille (ex.
+    # R1 — scalar type families. A cross-family assignment (e.g
     # `decimal` → `string`) does not compile on typed targets (Java `String = BigDecimal`,
     # cf. incident #3eeb1951). Kinds are grouped into families; same family = OK
     # (e.g. integer→decimal, numeric widening), cross-family = reject.
@@ -2733,7 +2733,7 @@ class ACIRValidator:
                 tk, tp = self._v03_resolve_tref(tf, idx)
                 path = f"$.module.units[{uname}].IO_MUTATE.data.{f}"
 
-                # ── scalaire ↔ scalaire (R1) ──
+                # ── scalar ↔ scalar (R1) ──
                 if tk == "scalar":
                     sk, sp = self._v03_source_tref(v, unit, idx, loop_env)
                     if sk == "scalar" and not self._scalar_compatible(sp, tp):
@@ -2749,7 +2749,7 @@ class ACIRValidator:
                                 f"the same data with diverging types — unify them."))
                     continue
 
-                # ── record / collection-de-record (existant) ──
+                # ── record / collection-of-record (existing) ──
                 a_rec = None
                 if tk == "collection":
                     ek, er = self._v03_resolve_tref(tp, idx)
@@ -2885,7 +2885,7 @@ class ACIRValidator:
         walk(module)
 
     # Tokenizer + recursive-descent parser for the $calculate DSL.
-    # Grammaire (cf. proposal) :
+    # Grammar (cf. proposal) :
     #   formula     := expr
     #   expr        := term (('+' | '-') term)*
     #   term        := factor (('*' | '/' | '%') factor)*
