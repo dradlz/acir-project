@@ -2346,7 +2346,7 @@ class ACIRValidator:
             if isinstance(node, dict):
                 # $calculate.formula is itself a string; the walker will not descend
                 # into it for $input — the formula is validated by the DSL parser
-                # at level 3. Le scope "calculate" scope applies to the calculate's inputs, 
+                # at level 3. The "calculate" scope applies to the calculate's inputs, 
                 # not to the formula.
                 if "$input" in node and isinstance(node.get("$input"), str) and "*" in node["$input"]:
                     if not in_allowed_scope:
