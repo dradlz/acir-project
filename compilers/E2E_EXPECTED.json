@@ -5,7 +5,7 @@
     "tests/test_api.py::test_create_order_success"
   ],
   "known_failures": {
-    "tests/test_api.py::test_create_order_success": "#14 - the synthesised request body ignores the declared type, so the schema rejects it with 422",
-    "tests/test_api.py::test_cancel_order_success": "#15 - $auth reaches a UUID column as a string"
+    "tests/test_api.py::test_create_order_success": "#17 - $generate template emits an undefined `date` name (was #14, now fixed: the body type and 422 are resolved)",
+    "tests/test_api.py::test_cancel_order_success": "#18 - F_GUARD runs before the null-check (was #15, now fixed: $auth UUID coercion is resolved)"
   }
 }
