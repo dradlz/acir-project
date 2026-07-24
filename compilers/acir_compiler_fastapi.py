@@ -1332,6 +1332,23 @@ from __future__ import annotations
 {imports_str}
 
 
+def _as_uuid(v):
+    """Coerce a value to UUID for UUID-typed columns; pass UUID/None through.
+
+    A `$auth` claim or a path parameter arrives as a string, but the columns
+    it targets (`id`, `user_id`, …) are UUID-typed, and SQLAlchemy's UUID type
+    rejects a bare string. Idempotent and null-safe, so it is applied wherever
+    a value reaches a UUID column, regardless of source. A value that is not a
+    valid UUID is returned unchanged, so bad input surfaces as a normal error
+    rather than a crash here."""
+    if v is None or isinstance(v, UUID):
+        return v
+    try:
+        return UUID(str(v))
+    except (ValueError, AttributeError, TypeError):
+        return v
+
+
 class {service_class}:
     """Business logic — generated from ACIR X_UNIT definitions."""
 
@@ -1405,7 +1422,48 @@ class {service_class}:
                     return f"{ref}.{value}"
         return None
 
+    def _field_kind(self, entity_class: str, field_name: str) -> str:
+        """Scalar kind of `field_name` on the entity compiled as `entity_class`.
+
+        `entity_class` is a type_registry key (see _entity_class_from_acir_name).
+        Returns "" when the entity or field is unknown, or the field is not a
+        scalar. Used to decide when a value must be coerced to the column type.
+        """
+        if not entity_class or not field_name:
+            return ""
+        record = self.type_registry.get(entity_class)
+        if not record:
+            return ""
+        for f in record.get("fields", []):
+            if f.get("name") != field_name:
+                continue
+            ftype = f.get("type", {})
+            if not isinstance(ftype, dict):
+                return ""
+            ref = ftype.get("$ref", "")
+            if ref in self.alias_registry:
+                base = self.alias_registry[ref].get("base_type", {})
+                return base.get("kind", "") if isinstance(base, dict) else ""
+            return ftype.get("kind", "")
+        return ""
+
     def _compile_data_expr_py(self, expr, entity_class: str = "", field_name: str = "") -> str:
+        """Compile a data expression, coercing to the target column type.
+
+        Thin wrapper over `_compile_data_expr_inner`: when the destination
+        column is UUID-typed, a string-producing source ($auth, $input, a path
+        parameter) reaches it as a str, which SQLAlchemy's UUID type rejects.
+        `_as_uuid` (emitted in service.py) is idempotent and null-safe, so
+        wrapping is always sound. uuid4() and None need no coercion.
+        """
+        code = self._compile_data_expr_inner(expr, entity_class, field_name)
+        if (self._field_kind(entity_class, field_name) == "uuid"
+                and code not in ("None", "uuid4()")
+                and not code.startswith("_as_uuid(")):
+            return f"_as_uuid({code})"
+        return code
+
+    def _compile_data_expr_inner(self, expr, entity_class: str = "", field_name: str = "") -> str:
         """Convert an ACIR data expression into a Python expression string.
 
         Recognises:
@@ -1432,7 +1490,7 @@ class {service_class}:
                 return enum_ref
             return repr(expr)
         if isinstance(expr, list):
-            inner = ", ".join(self._compile_data_expr_py(e, entity_class, field_name) for e in expr)
+            inner = ", ".join(self._compile_data_expr_inner(e, entity_class, field_name) for e in expr)
             return f"[{inner}]"
         if isinstance(expr, dict):
             if "$input" in expr:
@@ -1460,9 +1518,9 @@ class {service_class}:
                 if isinstance(hash_arg, dict) and "value" in hash_arg and not any(
                     k.startswith("$") for k in hash_arg.keys()
                 ):
-                    inner = self._compile_data_expr_py(hash_arg["value"], entity_class, field_name)
+                    inner = self._compile_data_expr_inner(hash_arg["value"], entity_class, field_name)
                 else:
-                    inner = self._compile_data_expr_py(hash_arg, entity_class, field_name)
+                    inner = self._compile_data_expr_inner(hash_arg, entity_class, field_name)
                 return f"_hash_password({inner})"
             # v0.2 #39a parity — `$auth: <claim>` reads the JWT payload that the
             # endpoint passes through as the `current_user` kwarg. Service methods
@@ -4362,6 +4420,81 @@ asyncio_mode = auto
 testpaths = tests
 """)
 
+    def _test_scalar_value(self, kind: str, contracts: list, fname: str):
+        """A valid JSON value for a scalar `kind`, satisfying simple contracts.
+
+        C_RANGE.min is respected for numbers so the value is not rejected by
+        the very validation the happy-path test is meant to pass.
+        """
+        cmin = None
+        for c in contracts or []:
+            if isinstance(c, dict) and c.get("primitive") == "C_RANGE" and c.get("min") is not None:
+                cmin = c["min"]
+        if kind == "string":
+            return "test@example.com" if "email" in fname.lower() else f"Test {fname}"
+        if kind == "integer":
+            return max(1, cmin) if cmin is not None else 1
+        if kind == "decimal":
+            return float(cmin) if cmin is not None and cmin > 9.99 else 9.99
+        if kind == "boolean":
+            return True
+        if kind == "uuid":
+            return "550e8400-e29b-41d4-a716-446655440000"
+        if kind == "datetime":
+            return "2024-01-01T00:00:00Z"
+        if kind == "date":
+            return "2024-01-01"
+        if kind == "time":
+            return "00:00:00"
+        if kind == "duration":
+            return "PT1H"
+        return f"test_{fname}"
+
+    def _test_value(self, type_node, contracts, fname):
+        """A valid JSON value for any ACIR type node, recursively.
+
+        The previous implementation emitted `'test_' + field_name` for anything
+        that was not a bare scalar, so a `D_COLLECTION` of records received a
+        string and the endpoint rejected the happy-path body with 422. This
+        descends into collections, nested records, enums and aliases so the
+        synthesised body actually matches the declared input type.
+        """
+        if not isinstance(type_node, dict):
+            return None
+        ref = type_node.get("$ref")
+        if ref:
+            if ref in self.alias_registry:
+                alias = self.alias_registry[ref]
+                return self._test_value(alias.get("base_type", {}),
+                                        (alias.get("contracts", []) or []) + (contracts or []), fname)
+            if ref in self.enum_registry:
+                vals = self.enum_registry[ref].get("values", [])
+                return vals[0]["name"] if vals else "VALUE"
+            if ref in self.type_registry:
+                return self._test_record(self.type_registry[ref])
+            return None
+        prim = type_node.get("primitive", "")
+        if prim == "D_COLLECTION":
+            if type_node.get("kind") == "map":
+                return {"key": self._test_value(type_node.get("value_type", {}), [], fname)}
+            return [self._test_value(type_node.get("element_type", {}), [], fname)]
+        if prim == "D_RECORD":
+            return self._test_record(type_node)
+        if prim == "D_ENUM":
+            vals = type_node.get("values", [])
+            return vals[0]["name"] if vals else "VALUE"
+        return self._test_scalar_value(type_node.get("kind", ""), contracts, fname)
+
+    def _test_record(self, record):
+        """Build a valid object for a D_RECORD by synthesising each field."""
+        obj = {}
+        for field in record.get("fields", []):
+            fname = field.get("name", "")
+            val = self._test_value(field.get("type", {}), field.get("contracts", []), fname)
+            if val is not None:
+                obj[fname] = val
+        return obj
+
     def _build_test_body(self, input_ref, valid=True):
         if not input_ref:
             return None
@@ -4374,6 +4507,13 @@ testpaths = tests
         if not fields:
             return None
 
+        if valid:
+            obj = self._test_record(record)
+            return obj if obj else None
+
+        # Invalid data: make the first field with a usable scalar contract
+        # invalid. Best-effort — records whose fields are all nested/collection
+        # yield no invalid body, and no validation test is generated (unchanged).
         obj = {}
         for field in fields:
             fname = field.get("name", "")
@@ -4381,49 +4521,26 @@ testpaths = tests
             contracts = field.get("contracts", [])
             kind = ftype.get("kind", "") if isinstance(ftype, dict) else ""
             ref = ftype.get("$ref", "") if isinstance(ftype, dict) else ""
-
             if ref and ref in self.alias_registry:
                 alias = self.alias_registry[ref]
                 base = alias.get("base_type", {})
                 kind = base.get("kind", "") if isinstance(base, dict) else ""
                 contracts = alias.get("contracts", []) + contracts
-
-            if valid:
-                if kind == "string":
-                    if "email" in fname.lower():
-                        obj[fname] = "test@example.com"
-                    else:
-                        obj[fname] = f"Test {fname}"
-                elif kind == "integer":
-                    obj[fname] = 1
-                elif kind == "decimal":
-                    obj[fname] = 9.99
-                elif kind == "boolean":
-                    obj[fname] = True
-                elif kind == "uuid":
-                    obj[fname] = "550e8400-e29b-41d4-a716-446655440000"
-                elif ref in self.enum_registry:
-                    vals = self.enum_registry[ref].get("values", [])
-                    obj[fname] = vals[0]["name"] if vals else "VALUE"
-                else:
-                    obj[fname] = f"test_{fname}"
+            for c in contracts:
+                if isinstance(c, dict):
+                    prim = c.get("primitive", "")
+                    if prim == "C_RANGE" and c.get("min") is not None:
+                        obj[fname] = c["min"] - 1
+                        break
+                    elif prim == "C_LENGTH" and c.get("max"):
+                        obj[fname] = "x" * (c["max"] + 10)
+                        break
+                    elif prim == "C_PATTERN":
+                        obj[fname] = "!!!invalid!!!"
+                        break
             else:
-                # Generate invalid data
-                for c in contracts:
-                    if isinstance(c, dict):
-                        prim = c.get("primitive", "")
-                        if prim == "C_RANGE" and c.get("min") is not None:
-                            obj[fname] = c["min"] - 1
-                            break
-                        elif prim == "C_LENGTH" and c.get("max"):
-                            obj[fname] = "x" * (c["max"] + 10)
-                            break
-                        elif prim == "C_PATTERN":
-                            obj[fname] = "!!!invalid!!!"
-                            break
-                else:
-                    if kind in ("integer", "decimal"):
-                        obj[fname] = "not_a_number"
+                if kind in ("integer", "decimal"):
+                    obj[fname] = "not_a_number"
 
         return obj if obj else None
 
